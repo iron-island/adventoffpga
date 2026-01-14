@@ -1,5 +1,9 @@
 *.vcd
 experimental/
+input/*
 test/sim_build
 test/__pycache__/
 test/results.xml
+
+# Do not ignore README files in any directory
+!README

@@ -1,0 +1,3 @@
+Put your puzzle input file in this directory.
+Modify `INPUT_FILE` variable in `test/cocotb_test.py` to point to your input file.
+NOTE: Do NOT check-in puzzle inputs. The `.gitignore` file ignores all files inside this directory except for this `README`.
