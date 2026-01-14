@@ -4,6 +4,36 @@
 import cocotb
 from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
+import pprint
+
+INPUT_FILE = "../input/input.txt"
+
+#---------------------------------
+# Native Python Utility Functions
+#---------------------------------
+
+# Function for parsing the puzzle input file and outputting a dictionary
+#   to represent the graph
+def parse_input(in_file):
+    graph_dict = {}
+
+    with open(in_file) as file:
+        line = file.readline()
+
+        while line:
+            line = line.strip()
+
+            node, next_nodes = line.split(": ")
+            graph_dict[node] = next_nodes.split(" ")
+
+            line = file.readline()
+
+    return graph_dict
+
+#--------------------------
+# cocotb Utility Functions
+#--------------------------
+
 async def generate_clock(dut):
     """Generate clock pulses."""
 
@@ -13,6 +43,9 @@ async def generate_clock(dut):
         dut.clk.value = 1
         await Timer(1, unit="ns")
 
+#--------------
+# cocotb Tests
+#--------------
 
 @cocotb.test()
 async def reset_test(dut):
@@ -40,3 +73,9 @@ async def reset_test(dut):
     # Wait for a few clock cycles before simulation ends
     await Timer(5, unit="ns")
 
+@cocotb.test()
+async def input_file_test(dut):
+    graph_dict = parse_input(INPUT_FILE)
+
+    # Print graph
+    pprint.pp(graph_dict)
