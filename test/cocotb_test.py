@@ -6,6 +6,7 @@ from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
 import pprint
 
+CLK_PERIOD_NS = 10
 INPUT_FILE = "../input/input.txt"
 
 #---------------------------------
@@ -30,18 +31,32 @@ def parse_input(in_file):
 
     return graph_dict
 
-#--------------------------
-# cocotb Utility Functions
-#--------------------------
+#-------------------
+# cocotb Coroutines
+#-------------------
 
 async def generate_clock(dut):
     """Generate clock pulses."""
 
-    for _ in range(10):
+    for _ in range(100):
         dut.clk.value = 0
-        await Timer(1, unit="ns")
+        await Timer(CLK_PERIOD_NS/2, unit="ns")
         dut.clk.value = 1
-        await Timer(1, unit="ns")
+        await Timer(CLK_PERIOD_NS/2, unit="ns")
+
+async def generate_reset(dut):
+    """ Generate reset pulse"""
+
+    # Assert reset, can be asynchronous but wait for a clock edge for simplicity
+    await Timer(CLK_PERIOD_NS, unit="ns")
+    await RisingEdge(dut.clk)
+    dut.rst_n.value = 0
+    cocotb.log.info("Asserted reset")
+
+    # Deassert reset synchronously
+    await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
+    cocotb.log.info("Deasserted reset")
 
 #--------------
 # cocotb Tests
@@ -52,30 +67,21 @@ async def reset_test(dut):
     """Check reset values"""
 
     cocotb.start_soon(generate_clock(dut))  # run the clock "in the background"
+    cocotb.start_soon(generate_reset(dut))
 
-    dut.rst_n.value = 1
     dut.data_in.value = 1
     await Timer(5, unit="ns")  # wait a bit
     await FallingEdge(dut.clk)  # wait for falling edge/"negedge"
 
-    # Assert reset
-    dut.rst_n.value = 0
-
-    await Timer(1, unit="ps") # check after a small amount of time after reset was asserted
     cocotb.log.info("data_out is %s", dut.data_out.value)
     assert dut.data_out.value == 0
 
-    # Deassert reset
-    await Timer(2, unit="ns")
-    await RisingEdge(dut.clk)
-    dut.rst_n.value = 1
-
     # Wait for a few clock cycles before simulation ends
-    await Timer(5, unit="ns")
+    await Timer(50*CLK_PERIOD_NS, unit="ns")
 
 @cocotb.test()
 async def input_file_test(dut):
     graph_dict = parse_input(INPUT_FILE)
 
     # Print graph
-    pprint.pp(graph_dict)
+    #pprint.pp(graph_dict)
