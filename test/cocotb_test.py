@@ -2,7 +2,7 @@
 # Ref: https://docs.cocotb.org/en/stable/quickstart.html#creating-a-test
 
 import cocotb
-from cocotb.triggers import FallingEdge, Timer
+from cocotb.triggers import RisingEdge, FallingEdge, Timer
 
 async def generate_clock(dut):
     """Generate clock pulses."""
@@ -34,7 +34,8 @@ async def reset_test(dut):
 
     # Deassert reset
     await Timer(2, unit="ns")
-    await FallingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    dut.rst_n.value = 1
 
     # Wait for a few clock cycles before simulation ends
     await Timer(5, unit="ns")
