@@ -36,7 +36,7 @@ module digital_top
         end else if (wr_end_node) begin
             // TODO: end node accumulator
 
-            end_node_idx <= node_idx;
+            end_node_idx <= next_node_idx;
         end
     end
 
