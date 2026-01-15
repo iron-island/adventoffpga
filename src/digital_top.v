@@ -9,7 +9,7 @@
 
 module digital_top
 #(
-    parameter PARAM_NODE_IDX_WIDTH  = 9,
+    parameter PARAM_NODE_IDX_WIDTH  = 10,
     parameter PARAM_COUNTER_WIDTH   = 4,
     parameter PARAM_ACCUM_VAL_WIDTH = 24,
     parameter PARAM_FIFO_DEPTH      = 32
