@@ -29,6 +29,9 @@ def parse_input(in_file):
 
             line = file.readline()
 
+    # Add "out" node with no target nodes
+    graph_dict["out"] = []
+
     return graph_dict
 
 #-------------------
@@ -36,16 +39,16 @@ def parse_input(in_file):
 #-------------------
 
 async def generate_clock(dut):
-    """Generate clock pulses."""
+    """Generate clock pulses """
 
-    for _ in range(100):
+    for _ in range(1000):
         dut.clk.value = 0
         await Timer(CLK_PERIOD_NS/2, unit="ns")
         dut.clk.value = 1
         await Timer(CLK_PERIOD_NS/2, unit="ns")
 
 async def generate_reset(dut):
-    """ Generate reset pulse"""
+    """ Generate reset pulse """
 
     # Assert reset, can be asynchronous but wait for a clock edge for simplicity
     await Timer(CLK_PERIOD_NS, unit="ns")
@@ -62,7 +65,7 @@ async def generate_reset(dut):
 # cocotb Tests
 #--------------
 
-@cocotb.test()
+#@cocotb.test()
 async def reset_test(dut):
     """Check reset values"""
 
@@ -78,9 +81,55 @@ async def reset_test(dut):
     # Wait for a few clock cycles before simulation ends
     await Timer(50*CLK_PERIOD_NS, unit="ns")
 
-@cocotb.test()
+#@cocotb.test()
 async def input_file_test(dut):
     graph_dict = parse_input(INPUT_FILE)
 
     # Print graph
     #pprint.pp(graph_dict)
+
+@cocotb.test()
+async def part1_test(dut):
+    graph_dict = parse_input(INPUT_FILE)
+
+    # Create index values for nodes
+    # Index values don't need to be in order, so no sorting is needed
+    node_idx_dict = {}
+    for idx, node in enumerate(graph_dict):
+        node_idx_dict[node] = idx
+
+    cocotb.start_soon(generate_clock(dut))
+    cocotb.start_soon(generate_reset(dut))
+
+    # Wait for a few cycles before starting the run
+    await Timer(3*CLK_PERIOD_NS, unit="ns")
+
+    # Start the run synchronously and input start node index
+    start_node = "you"
+    start_node_idx_exp = node_idx_dict[start_node]
+    end_node = "out"
+    end_node_idx_exp = node_idx_dict[end_node]
+
+    await FallingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    dut.part_sel.value = 0
+    dut.start_run.value = 1
+    dut.next_node_idx.value = start_node_idx_exp
+
+    # Check that start node index was written to FIFO
+    await RisingEdge(dut.clk)
+    cocotb.log.info(f'Start node: {start_node}, index {start_node_idx_exp}')
+    assert(dut.dut.fifo_node_idx[0].value == start_node_idx_exp)
+
+    # Input end node index
+    dut.next_node_idx.value = end_node_idx_exp
+
+    # Check that end node index was written to register
+    await RisingEdge(dut.clk)
+    cocotb.log.info(f'End node: {end_node}, index {end_node_idx_exp}')
+    assert(dut.dut.end_node_idx.value == end_node_idx_exp)
+
+    # TODO
+
+    # Wait for a few clock cycles before simulation ends
+    await Timer(10*CLK_PERIOD_NS, unit="ns")
