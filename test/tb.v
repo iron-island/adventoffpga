@@ -7,7 +7,7 @@
  */
 module tb ();
 
-    parameter PARAM_NODE_IDX_WIDTH  = 9;
+    parameter PARAM_NODE_IDX_WIDTH  = 10;
     parameter PARAM_COUNTER_WIDTH   = 4;
     parameter PARAM_ACCUM_VAL_WIDTH = 24;
     parameter PARAM_FIFO_DEPTH      = 32;
@@ -24,6 +24,7 @@ module tb ();
     reg clk;
     reg rst_n;
 
+    reg part_sel;
     reg start_run;
 
     reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx;
@@ -35,7 +36,7 @@ module tb ();
         .clk      (clk),
         .rst_n    (rst_n),
 
-        .part_sel (1'b0), // TODO: use for part 1 and part 2
+        .part_sel (part_sel),
         .start_run(start_run),
 
         .node_idx(node_idx),
