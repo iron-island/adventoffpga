@@ -69,12 +69,11 @@ async def reset_test(dut):
     cocotb.start_soon(generate_clock(dut))  # run the clock "in the background"
     cocotb.start_soon(generate_reset(dut))
 
-    dut.data_in.value = 1
     await Timer(5, unit="ns")  # wait a bit
     await FallingEdge(dut.clk)  # wait for falling edge/"negedge"
 
-    cocotb.log.info("data_out is %s", dut.data_out.value)
-    assert dut.data_out.value == 0
+    cocotb.log.info("FSM state is %s", dut.dut.curr_state)
+    assert dut.dut.curr_state.value == 0
 
     # Wait for a few clock cycles before simulation ends
     await Timer(50*CLK_PERIOD_NS, unit="ns")
