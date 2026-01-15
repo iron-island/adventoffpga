@@ -104,28 +104,33 @@ async def part1_test(dut):
     # Wait for a few cycles before starting the run
     await Timer(3*CLK_PERIOD_NS, unit="ns")
 
-    # Start the run synchronously and input start node index
+    # Start the run synchronized to negedge
+    await FallingEdge(dut.clk)
+    dut.part_sel.value = 0
+    dut.start_run.value = 1
+    await RisingEdge(dut.clk)
+
+    # Input start node index
     start_node = "you"
     start_node_idx_exp = node_idx_dict[start_node]
     end_node = "out"
     end_node_idx_exp = node_idx_dict[end_node]
 
     await FallingEdge(dut.clk)
-    await RisingEdge(dut.clk)
-    dut.part_sel.value = 0
-    dut.start_run.value = 1
     dut.next_node_idx.value = start_node_idx_exp
+    await RisingEdge(dut.clk)
 
     # Check that start node index was written to FIFO
-    await RisingEdge(dut.clk)
+    await FallingEdge(dut.clk)
     cocotb.log.info(f'Start node: {start_node}, index {start_node_idx_exp}')
     assert(dut.dut.fifo_node_idx[0].value == start_node_idx_exp)
 
     # Input end node index
     dut.next_node_idx.value = end_node_idx_exp
+    await RisingEdge(dut.clk)
 
     # Check that end node index was written to register
-    await RisingEdge(dut.clk)
+    await FallingEdge(dut.clk)
     cocotb.log.info(f'End node: {end_node}, index {end_node_idx_exp}')
     assert(dut.dut.end_node_idx.value == end_node_idx_exp)
 
