@@ -95,8 +95,10 @@ async def part1_test(dut):
     # Create index values for nodes
     # Index values don't need to be in order, so no sorting is needed
     node_idx_dict = {}
+    idx_node_dict = {}
     for idx, node in enumerate(graph_dict):
         node_idx_dict[node] = idx
+        idx_node_dict[idx] = node
 
     cocotb.start_soon(generate_clock(dut))
     cocotb.start_soon(generate_reset(dut))
@@ -109,6 +111,10 @@ async def part1_test(dut):
     dut.part_sel.value = 0
     dut.start_run.value = 1
     await RisingEdge(dut.clk)
+
+    # TODO: Testbench has knowledge of the design to know when to drive the start and end node indices,
+    #         by reusing the next_node_idx input. Alternatively this can be replaced by dedicated
+    #         inputs to be more general, and would also simplify the design
 
     # Input start node index
     start_node = "you"
@@ -133,6 +139,26 @@ async def part1_test(dut):
     await FallingEdge(dut.clk)
     cocotb.log.info(f'End node: {end_node}, index {end_node_idx_exp}')
     assert(dut.dut.end_node_idx.value == end_node_idx_exp)
+
+    # Drive target nodes
+    # TODO: iterate until design says its done
+    await FallingEdge(dut.clk)
+    node_idx = int(dut.node_idx_reg.value)
+    node = idx_node_dict[node_idx]
+    next_node_count = len(graph_dict[node])
+    for next_node in graph_dict[node]:
+        # Convert to node index
+        next_node_idx = node_idx_dict[next_node]
+
+        dut.next_node_idx.value = next_node_idx
+        dut.next_node_counter.value = next_node_count
+
+        next_node_count -= 1
+
+        # Update testbench variable for debugging and logging
+        dut.next_node_string.value = (ord(next_node[0]) << 16) + (ord(next_node[1]) << 8) + (ord(next_node[2]))
+
+        await FallingEdge(dut.clk)
 
     # TODO
 
