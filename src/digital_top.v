@@ -16,8 +16,9 @@
 `define ZERO_VAL_SEL    2'b00
 
 // For accum_input0_sel
-`define FIFO_WR_VAL_SEL 2'b01
-`define END_NODE_SEL    2'b10
+`define FIFO_WR_VAL_SEL        2'b01
+`define FIFO_DIRECT_WR_VAL_SEL 2'b10
+`define END_NODE_SEL           2'b11
 
 // For accum_input1_sel
 `define ONE_VAL_SEL          2'b01
@@ -68,15 +69,17 @@ module digital_top
     reg [1:0] accum_input1_sel;
 
     reg [$clog2(PARAM_FIFO_DEPTH)-1:0] prev_fifo_rd_ptr;
+    reg [$clog2(PARAM_FIFO_DEPTH)-1:0] fifo_direct_wr_ptr;
 
     assign prev_fifo_rd_ptr = (fifo_rd_ptr - 1'b1);
 
     always@(*) begin
         case (accum_input0_sel)
-            `ZERO_VAL_SEL    : accum_input0 = 'd0;
-            `FIFO_WR_VAL_SEL : accum_input0 = fifo_accum_val[fifo_wr_ptr];
-            `END_NODE_SEL    : accum_input0 = end_node_accum;
-            default          : accum_input0 = 'd0;
+            `ZERO_VAL_SEL           : accum_input0 = 'd0;
+            `FIFO_WR_VAL_SEL        : accum_input0 = fifo_accum_val[fifo_wr_ptr];
+            `FIFO_DIRECT_WR_VAL_SEL : accum_input0 = fifo_accum_val[fifo_direct_wr_ptr];
+            `END_NODE_SEL           : accum_input0 = end_node_accum;
+            default                 : accum_input0 = 'd0;
         endcase
     end
 
@@ -98,7 +101,7 @@ module digital_top
     
     assign accum_result = (accum_input0 + accum_input1);
 
-    // Accumulator FIFO
+    // Accumulator result and node index FIFO
     reg [PARAM_ACCUM_VAL_WIDTH-1:0]    fifo_accum_val[PARAM_FIFO_DEPTH];
     reg [PARAM_NODE_IDX_WIDTH-1:0]     fifo_node_idx[PARAM_FIFO_DEPTH];
     reg                                fifo_valid[PARAM_FIFO_DEPTH];
@@ -108,6 +111,7 @@ module digital_top
 
     reg                                fifo_wr_en;
     reg                                fifo_rd_en;
+    reg                                fifo_direct_wr_en;
 
     reg                                fifo_wr_rd_ptr_eq;
     reg                                fifo_empty;
@@ -151,7 +155,29 @@ module digital_top
 
                     fifo_rd_ptr <= fifo_rd_ptr + 1'b1;
                 end
+                fifo_direct_wr_en : begin // direct writes for node indices that already exist
+                    // Write pointer isn't updated since the node index already exists
+                    // Valid flag isn't updated since its already valid
+                    // Only accumulator result is updated
+                    fifo_accum_val[fifo_direct_wr_ptr] <= accum_result;
+                end
             endcase
+        end
+    end
+
+    // Logic for checking presence of node index in FIFO
+    reg                                node_idx_present;
+
+    always@(*) begin
+        fifo_direct_wr_ptr = 'd0;
+        node_idx_present   = 1'b0;
+
+        for (int j = 0; j < PARAM_FIFO_DEPTH; j++) begin
+            // If FIFO data at pointer j is valid and has the node index
+            if ((fifo_valid[j[$clog2(PARAM_FIFO_DEPTH)-1:0]]) & (fifo_node_idx[j[$clog2(PARAM_FIFO_DEPTH)-1:0]] == next_node_idx)) begin
+                fifo_direct_wr_ptr = j[$clog2(PARAM_FIFO_DEPTH)-1:0];
+                node_idx_present   = 1'b1;
+            end
         end
     end
     
@@ -180,6 +206,8 @@ module digital_top
         // default values
         fifo_wr_en = 1'b0;
         fifo_rd_en = 1'b0;
+
+        fifo_direct_wr_en = 1'b0;
 
         wr_end_node = 1'b0;
 
@@ -230,10 +258,10 @@ module digital_top
                 next_state = `PUSH_NEXT_NODE;
             end
             `PUSH_NEXT_NODE   : begin
+                // TODO: logic for checking if next_node_idx already exists in the FIFO
                 // Push the next node
                 fifo_wr_en = 1'b1;
 
-                // TODO: logic for checking if next_node_idx already exists in the FIFO
                 // Pushing new nodes so we only need to copy the accumulated
                 //   value from the previous node
                 accum_input0_sel = `ZERO_VAL_SEL;
