@@ -34,14 +34,18 @@ def parse_input(in_file):
 
     return graph_dict
 
+def node_str2int(node):
+    # The nodes are 3 characters, so interpret each character as 8-bit ASCII
+    return (ord(node[0]) << 16) + (ord(node[1]) << 8) + (ord(node[2]))
+
 #-------------------
 # cocotb Coroutines
 #-------------------
 
-async def generate_clock(dut):
+async def generate_clock(dut, num_cycles):
     """Generate clock pulses """
 
-    for _ in range(1000):
+    for _ in range(num_cycles):
         dut.clk.value = 0
         await Timer(CLK_PERIOD_NS/2, unit="ns")
         dut.clk.value = 1
@@ -61,11 +65,12 @@ async def generate_reset(dut):
     dut.rst_n.value = 1
     cocotb.log.info("Deasserted reset")
 
-def update_tb_next_node_string(dut, next_node):
+def update_tb_node_strings(dut, curr_node, next_node):
     """ Updates value of 24-bit testbench variable """
 
-    # The nodes are 3 characters, so interpret each character as 8-bit ASCII
-    dut.next_node_string.value = (ord(next_node[0]) << 16) + (ord(next_node[1]) << 8) + (ord(next_node[2]))
+    if (curr_node != ""):
+        dut.curr_node_string.value = node_str2int(curr_node)
+    dut.next_node_string.value = node_str2int(next_node)
 
 #--------------
 # cocotb Tests
@@ -75,7 +80,7 @@ def update_tb_next_node_string(dut, next_node):
 async def reset_test(dut):
     """Check reset values"""
 
-    cocotb.start_soon(generate_clock(dut))  # run the clock "in the background"
+    cocotb.start_soon(generate_clock(dut, 20))  # run the clock "in the background"
     cocotb.start_soon(generate_reset(dut))
 
     await Timer(5, unit="ns")  # wait a bit
@@ -106,7 +111,7 @@ async def part1_test(dut):
         node_idx_dict[node] = idx
         idx_node_dict[idx] = node
 
-    cocotb.start_soon(generate_clock(dut))
+    cocotb.start_soon(generate_clock(dut, 2000))
     cocotb.start_soon(generate_reset(dut))
 
     # Wait for a few cycles before starting the run
@@ -130,7 +135,7 @@ async def part1_test(dut):
 
     await FallingEdge(dut.clk)
     dut.next_node_idx.value = start_node_idx_exp
-    update_tb_next_node_string(dut, start_node)
+    update_tb_node_strings(dut, "", start_node)
     await RisingEdge(dut.clk)
 
     # Check that start node index was written to FIFO
@@ -140,7 +145,7 @@ async def part1_test(dut):
 
     # Input end node index
     dut.next_node_idx.value = end_node_idx_exp
-    update_tb_next_node_string(dut, end_node)
+    update_tb_node_strings(dut, "", end_node)
     await RisingEdge(dut.clk)
 
     # Check that end node index was written to register
@@ -149,24 +154,28 @@ async def part1_test(dut):
     assert(dut.dut.end_node_idx.value == end_node_idx_exp)
 
     # Drive target nodes
-    # TODO: iterate until design says its done
     await FallingEdge(dut.clk)
-    node_idx = int(dut.node_idx_reg.value)
-    node = idx_node_dict[node_idx]
-    next_node_count = len(graph_dict[node])
-    for next_node in graph_dict[node]:
-        # Convert to node index
-        next_node_idx = node_idx_dict[next_node]
+    timeout_count = 500 # TODO: remove once design can flag its done
+    count = 0
+    while (dut.rd_next_node_reg.value) and (count < timeout_count):
+        count += 1
 
-        dut.next_node_idx.value = next_node_idx
-        dut.next_node_counter.value = next_node_count
+        node_idx = int(dut.node_idx_reg.value)
+        node = idx_node_dict[node_idx]
+        next_node_count = len(graph_dict[node])
+        for next_node in graph_dict[node]:
+            # Convert to node index
+            next_node_idx = node_idx_dict[next_node]
 
-        next_node_count -= 1
+            dut.next_node_idx.value = next_node_idx
+            dut.next_node_counter.value = next_node_count
 
-        # Update testbench variable for debugging and logging
-        update_tb_next_node_string(dut, next_node)
+            next_node_count -= 1
 
-        await FallingEdge(dut.clk)
+            # Update testbench variable for debugging and logging
+            update_tb_node_strings(dut, node, next_node)
+
+            await FallingEdge(dut.clk)
 
     # TODO
 

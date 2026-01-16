@@ -28,10 +28,12 @@ module tb ();
     reg start_run;
 
     reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx_reg;
+    reg                            rd_next_node_reg;
     reg [PARAM_NODE_IDX_WIDTH-1:0] next_node_idx;
     reg [PARAM_COUNTER_WIDTH-1:0]  next_node_counter;
 
     // Testbench variables for logging nodes as 3-character strings
+    reg [3*8:1] curr_node_string;
     reg [3*8:1] next_node_string;
     
     // Actual design digital top
@@ -43,6 +45,7 @@ module tb ();
         .start_run(start_run),
 
         .node_idx_reg(node_idx_reg),
+        .rd_next_node_reg(rd_next_node_reg),
         .next_node_idx(next_node_idx),
         .next_node_counter(next_node_counter)
     );
