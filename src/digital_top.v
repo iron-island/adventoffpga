@@ -38,6 +38,7 @@ module digital_top
     input                                  start_run,
 
     output reg [PARAM_NODE_IDX_WIDTH-1:0]  node_idx_reg,
+    output reg                             rd_next_node_reg,
     input      [PARAM_NODE_IDX_WIDTH-1:0]  next_node_idx,
     input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter // TODO: check max number of edges
 );
@@ -159,16 +160,19 @@ module digital_top
     reg [2:0] next_state;
 
     reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx;
+    reg                            rd_next_node;
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             curr_state <= `IDLE;
 
-            node_idx_reg <= 'd0;
+            node_idx_reg     <= 'd0;
+            rd_next_node_reg <= 'd0;
         end else if (start_run) begin
             curr_state <= next_state;
 
-            node_idx_reg <= node_idx;
+            node_idx_reg     <= node_idx;
+            rd_next_node_reg <= rd_next_node;
         end
     end
 
@@ -183,6 +187,7 @@ module digital_top
         accum_input1_sel = `ZERO_VAL_SEL;
 
         node_idx = node_idx_reg;
+        rd_next_node = rd_next_node_reg;
 
         case (curr_state)
             `IDLE             : begin
@@ -207,8 +212,9 @@ module digital_top
                 accum_input1_sel = `ZERO_VAL_SEL;
 
                 // Prepare to register node_idx_reg for fetching
-                //   during POP_CURR_NODE state
+                //   during POP_CURR_NODE state, and assert read control
                 node_idx = fifo_node_idx[fifo_rd_ptr];
+                rd_next_node = 1'b1;
 
                 next_state = `POP_CURR_NODE;
             end
@@ -224,14 +230,26 @@ module digital_top
                 next_state = `PUSH_NEXT_NODE;
             end
             `PUSH_NEXT_NODE   : begin
-                // TODO: Push control logic
+                // Push the next node
                 fifo_wr_en = 1'b1;
 
-                // TODO
+                // TODO: logic for checking if next_node_idx already exists in the FIFO
+                // Pushing new nodes so we only need to copy the accumulated
+                //   value from the previous node
+                accum_input0_sel = `ZERO_VAL_SEL;
                 accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
 
-                // TODO: state transition
-                next_state = `PUSH_NEXT_NODE;
+                // If on the last next_node_idx, go back to popping the queue,
+                //   otherwise there are more next_node_idx so keep pushing
+                if (next_node_counter == 'd1) begin
+                    // Prepare to register node_idx_reg for fetching
+                    //   during POP_CURR_NODE state
+                    node_idx = fifo_node_idx[fifo_rd_ptr];
+
+                    next_state = `POP_CURR_NODE;
+                end else begin
+                    next_state = `PUSH_NEXT_NODE;
+                end
             end
             // TODO: other states
             default           : begin
