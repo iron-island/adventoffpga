@@ -8,10 +8,21 @@
 `define RUN_MAC          3'b110
 `define OUTPUT_RESULT    3'b111
 
-// Accumulator select
-`define ZERO_VAL_SEL 2'b00
-`define FIFO_VAL_SEL 2'b01
-`define END_NODE_SEL 2'b10
+// Accumulator selects, some values
+//   are repeated because they get used
+//   by the distinct accum_input0 and accum_input1 muxes
+
+// For both accum_input0_sel and accum_input1_sel
+`define ZERO_VAL_SEL    2'b00
+
+// For accum_input0_sel
+`define FIFO_WR_VAL_SEL 2'b01
+`define END_NODE_SEL    2'b10
+
+// For accum_input1_sel
+`define ONE_VAL_SEL          2'b01
+`define FIFO_RD_VAL_SEL      2'b10
+`define FIFO_PREV_RD_VAL_SEL 2'b11
 
 module digital_top
 #(
@@ -50,20 +61,41 @@ module digital_top
     // Inputs to the accumulator are controlled by the FSM
     wire [PARAM_ACCUM_VAL_WIDTH-1:0] accum_result;
 
-    reg [PARAM_ACCUM_VAL_WIDTH-1:0] val_add;
-    reg [PARAM_ACCUM_VAL_WIDTH-1:0] accum_input;
-    reg [1:0] accum_input_sel;
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] accum_input0;
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] accum_input1;
+    reg [1:0] accum_input0_sel;
+    reg [1:0] accum_input1_sel;
+
+    reg [$clog2(PARAM_FIFO_DEPTH)-1:0] prev_fifo_rd_ptr;
+
+    assign prev_fifo_rd_ptr = (fifo_rd_ptr - 1'b1);
 
     always@(*) begin
-        case (accum_input_sel)
-            `ZERO_VAL_SEL : accum_input = 'd0;
-            `FIFO_VAL_SEL : accum_input = fifo_accum_val[fifo_wr_ptr];
-            `END_NODE_SEL : accum_input = end_node_accum;
-            default       : accum_input = 'd0;
+        case (accum_input0_sel)
+            `ZERO_VAL_SEL    : accum_input0 = 'd0;
+            `FIFO_WR_VAL_SEL : accum_input0 = fifo_accum_val[fifo_wr_ptr];
+            `END_NODE_SEL    : accum_input0 = end_node_accum;
+            default          : accum_input0 = 'd0;
+        endcase
+    end
+
+    always@(*) begin
+        case (accum_input1_sel)
+            `ZERO_VAL_SEL    : accum_input1 = 'd0;
+            `ONE_VAL_SEL     : accum_input1 = 'd1;
+            `FIFO_RD_VAL_SEL : accum_input1 = fifo_accum_val[fifo_rd_ptr];
+                               // Points to the last read register in the FIFO to avoid
+                               //   needing to save the value to another register.
+                               // This is valid because read values don't get flushed
+                               // This is also valid even when FIFO is full, but not
+                               //   when it overflows because the selected register
+                               //   gets overwritten during the cycle when the FIFO would be full
+            `FIFO_PREV_RD_VAL_SEL : accum_input1 = fifo_accum_val[prev_fifo_rd_ptr];
+            default          : accum_input1 = 'd0;
         endcase
     end
     
-    assign accum_result = (accum_input + val_add);
+    assign accum_result = (accum_input0 + accum_input1);
 
     // Accumulator FIFO
     reg [PARAM_ACCUM_VAL_WIDTH-1:0]    fifo_accum_val[PARAM_FIFO_DEPTH];
@@ -147,8 +179,8 @@ module digital_top
 
         wr_end_node = 1'b0;
 
-        accum_input_sel = `ZERO_VAL_SEL;
-        val_add = 'd0;
+        accum_input0_sel = `ZERO_VAL_SEL;
+        accum_input1_sel = `ZERO_VAL_SEL;
 
         node_idx = node_idx_reg;
 
@@ -161,8 +193,8 @@ module digital_top
                 fifo_wr_en = 1'b1;
 
                 // Initialize start node with 1
-                accum_input_sel = `ZERO_VAL_SEL;
-                val_add = 'd1;
+                accum_input0_sel = `ZERO_VAL_SEL;
+                accum_input1_sel = `ONE_VAL_SEL;
 
                 next_state = `FETCH_END_NODE;
             end
@@ -171,8 +203,8 @@ module digital_top
                 wr_end_node = 1'b1;
 
                 // Initialize end node with 0
-                accum_input_sel = `END_NODE_SEL;
-                val_add = 'd0;
+                accum_input0_sel = `END_NODE_SEL;
+                accum_input1_sel = `ZERO_VAL_SEL;
 
                 // Prepare to register node_idx_reg for fetching
                 //   during POP_CURR_NODE state
@@ -181,12 +213,22 @@ module digital_top
                 next_state = `POP_CURR_NODE;
             end
             `POP_CURR_NODE    : begin
+                // Pop the current node
                 fifo_rd_en = 1'b1;
+
+                // Prepare the accumulator inputs for pushing
+                //   to the FIFO in PUSH_NEXT_NODE state
+                accum_input0_sel = `FIFO_WR_VAL_SEL;
+                accum_input1_sel = `FIFO_RD_VAL_SEL;
 
                 next_state = `PUSH_NEXT_NODE;
             end
             `PUSH_NEXT_NODE   : begin
                 // TODO: Push control logic
+                fifo_wr_en = 1'b1;
+
+                // TODO
+                accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
 
                 // TODO: state transition
                 next_state = `PUSH_NEXT_NODE;
