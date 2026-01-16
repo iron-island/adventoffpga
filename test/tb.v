@@ -27,7 +27,7 @@ module tb ();
     reg part_sel;
     reg start_run;
 
-    reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx;
+    reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx_reg;
     reg [PARAM_NODE_IDX_WIDTH-1:0] next_node_idx;
     reg [PARAM_COUNTER_WIDTH-1:0]  next_node_counter;
     
@@ -39,7 +39,7 @@ module tb ();
         .part_sel (part_sel),
         .start_run(start_run),
 
-        .node_idx(node_idx),
+        .node_idx_reg(node_idx_reg),
         .next_node_idx(next_node_idx),
         .next_node_counter(next_node_counter)
     );
