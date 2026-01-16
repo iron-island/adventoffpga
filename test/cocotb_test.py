@@ -61,6 +61,12 @@ async def generate_reset(dut):
     dut.rst_n.value = 1
     cocotb.log.info("Deasserted reset")
 
+def update_tb_next_node_string(dut, next_node):
+    """ Updates value of 24-bit testbench variable """
+
+    # The nodes are 3 characters, so interpret each character as 8-bit ASCII
+    dut.next_node_string.value = (ord(next_node[0]) << 16) + (ord(next_node[1]) << 8) + (ord(next_node[2]))
+
 #--------------
 # cocotb Tests
 #--------------
@@ -124,6 +130,7 @@ async def part1_test(dut):
 
     await FallingEdge(dut.clk)
     dut.next_node_idx.value = start_node_idx_exp
+    update_tb_next_node_string(dut, start_node)
     await RisingEdge(dut.clk)
 
     # Check that start node index was written to FIFO
@@ -133,6 +140,7 @@ async def part1_test(dut):
 
     # Input end node index
     dut.next_node_idx.value = end_node_idx_exp
+    update_tb_next_node_string(dut, end_node)
     await RisingEdge(dut.clk)
 
     # Check that end node index was written to register
@@ -156,7 +164,7 @@ async def part1_test(dut):
         next_node_count -= 1
 
         # Update testbench variable for debugging and logging
-        dut.next_node_string.value = (ord(next_node[0]) << 16) + (ord(next_node[1]) << 8) + (ord(next_node[2]))
+        update_tb_next_node_string(dut, next_node)
 
         await FallingEdge(dut.clk)
 
