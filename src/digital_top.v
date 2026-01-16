@@ -2,10 +2,16 @@
 `define IDLE             3'b000
 `define FETCH_START_NODE 3'b001
 `define FETCH_END_NODE   3'b010
-`define FETCH_NEXT_NODE  3'b011
-`define RUN_MUL          3'b100
-`define RUN_MAC          3'b101
-`define OUTPUT_RESULT    3'b110
+`define POP_CURR_NODE    3'b011
+`define PUSH_NEXT_NODE   3'b100
+`define RUN_MUL          3'b101
+`define RUN_MAC          3'b110
+`define OUTPUT_RESULT    3'b111
+
+// Accumulator select
+`define ZERO_VAL_SEL 2'b00
+`define FIFO_VAL_SEL 2'b01
+`define END_NODE_SEL 2'b10
 
 module digital_top
 #(
@@ -20,7 +26,7 @@ module digital_top
     input                                  part_sel,
     input                                  start_run,
 
-    output reg [PARAM_NODE_IDX_WIDTH-1:0]  node_idx,
+    output reg [PARAM_NODE_IDX_WIDTH-1:0]  node_idx_reg,
     input      [PARAM_NODE_IDX_WIDTH-1:0]  next_node_idx,
     input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter // TODO: check max number of edges
 );
@@ -39,6 +45,25 @@ module digital_top
             end_node_idx <= next_node_idx;
         end
     end
+
+    // Accumulator
+    // Inputs to the accumulator are controlled by the FSM
+    wire [PARAM_ACCUM_VAL_WIDTH-1:0] accum_result;
+
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] val_add;
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] accum_input;
+    reg [1:0] accum_input_sel;
+
+    always@(*) begin
+        case (accum_input_sel)
+            `ZERO_VAL_SEL : accum_input = 'd0;
+            `FIFO_VAL_SEL : accum_input = fifo_accum_val[fifo_wr_ptr];
+            `END_NODE_SEL : accum_input = end_node_accum;
+            default       : accum_input = 'd0;
+        endcase
+    end
+    
+    assign accum_result = (accum_input + val_add);
 
     // Accumulator FIFO
     reg [PARAM_ACCUM_VAL_WIDTH-1:0]    fifo_accum_val[PARAM_FIFO_DEPTH];
@@ -79,7 +104,7 @@ module digital_top
                 fifo_wr_en   : begin
                     // TODO: Add node_idx checking for fifo_node_idx, where fifo_accum_val would no
                     //         longer depend on write pointer
-                    fifo_accum_val[fifo_wr_ptr] <= 'd0; // TODO: accumulate instead of writing 0
+                    fifo_accum_val[fifo_wr_ptr] <= accum_result;
                     fifo_node_idx[fifo_wr_ptr]  <= next_node_idx;
                     fifo_valid[fifo_wr_ptr]     <= 1'b1;
 
@@ -101,11 +126,17 @@ module digital_top
     reg [2:0] curr_state;
     reg [2:0] next_state;
 
+    reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx;
+
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             curr_state <= `IDLE;
-        end else begin
-            curr_state <= (start_run) ? next_state : curr_state;
+
+            node_idx_reg <= 'd0;
+        end else if (start_run) begin
+            curr_state <= next_state;
+
+            node_idx_reg <= node_idx;
         end
     end
 
@@ -116,6 +147,11 @@ module digital_top
 
         wr_end_node = 1'b0;
 
+        accum_input_sel = `ZERO_VAL_SEL;
+        val_add = 'd0;
+
+        node_idx = node_idx_reg;
+
         case (curr_state)
             `IDLE             : begin
                 next_state = `FETCH_START_NODE;
@@ -124,19 +160,36 @@ module digital_top
                 // FIFO is used for the start node
                 fifo_wr_en = 1'b1;
 
+                // Initialize start node with 1
+                accum_input_sel = `ZERO_VAL_SEL;
+                val_add = 'd1;
+
                 next_state = `FETCH_END_NODE;
             end
             `FETCH_END_NODE   : begin
                 // FIFO is not used for the end node, its saved in a separate register
                 wr_end_node = 1'b1;
 
-                next_state = `FETCH_NEXT_NODE;
-            end
-            `FETCH_NEXT_NODE  : begin
-                // TODO: Push and pop control logic
+                // Initialize end node with 0
+                accum_input_sel = `END_NODE_SEL;
+                val_add = 'd0;
 
-                // TODO: transition to other states
-                next_state = `FETCH_NEXT_NODE;
+                // Prepare to register node_idx_reg for fetching
+                //   during POP_CURR_NODE state
+                node_idx = fifo_node_idx[fifo_rd_ptr];
+
+                next_state = `POP_CURR_NODE;
+            end
+            `POP_CURR_NODE    : begin
+                fifo_rd_en = 1'b1;
+
+                next_state = `PUSH_NEXT_NODE;
+            end
+            `PUSH_NEXT_NODE   : begin
+                // TODO: Push control logic
+
+                // TODO: state transition
+                next_state = `PUSH_NEXT_NODE;
             end
             // TODO: other states
             default           : begin
