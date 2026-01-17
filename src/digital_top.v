@@ -43,8 +43,12 @@ module digital_top
     input      [PARAM_NODE_IDX_WIDTH-1:0]  next_node_idx,
     input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter, // TODO: check max number of edges
 
+    output reg [PARAM_ACCUM_VAL_WIDTH-1:0] part1_ans,
     output reg                             done_reg
 );
+
+    // Part 1: Answer is the end node accumulated value
+    assign part1_ans = end_node_accum;
 
     // Registers with specialized functions
     reg [PARAM_NODE_IDX_WIDTH-1:0]  start_node_idx;
