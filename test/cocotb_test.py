@@ -158,7 +158,7 @@ async def part1_test(dut):
     assert(dut.dut.end_node_idx.value == end_node_idx_exp)
 
     # Drive target nodes
-    await FallingEdge(dut.clk)
+    #await FallingEdge(dut.clk)
     timeout_count = 500 # TODO: remove once design can flag its done
     count = 0
     while (dut.rd_next_node_reg.value) and (count < timeout_count):
