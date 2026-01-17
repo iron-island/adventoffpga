@@ -16,18 +16,19 @@
 //   are repeated because they get used
 //   by the distinct accum_input0 and accum_input1 muxes
 
-// For both accum_input0_sel and accum_input1_sel
-`define ZERO_VAL_SEL    2'b00
-
 // For accum_input0_sel
-`define FIFO_WR_VAL_SEL        2'b01
-`define FIFO_DIRECT_WR_VAL_SEL 2'b10
-`define END_NODE_SEL           2'b11
+`define ZERO_IN0_SEL           3'b000
+`define FIFO_WR_IN0_SEL        3'b001
+`define FIFO_DIRECT_WR_IN0_SEL 3'b010
+`define MID0_NODE_IN0_SEL      3'b011
+`define MID1_NODE_IN0_SEL      3'b100
+`define END_NODE_IN0_SEL       3'b101
 
 // For accum_input1_sel
-`define ONE_VAL_SEL          2'b01
-`define FIFO_RD_VAL_SEL      2'b10
-`define FIFO_PREV_RD_VAL_SEL 2'b11
+`define ZERO_IN1_SEL         2'b00
+`define ONE_IN1_SEL          2'b01
+`define FIFO_RD_IN1_SEL      2'b10
+`define FIFO_PREV_RD_IN1_SEL 2'b11
 
 module digital_top
 #(
@@ -63,6 +64,8 @@ module digital_top
     reg [PARAM_NODE_IDX_WIDTH-1:0]  mid1_node_idx;
     reg [PARAM_NODE_IDX_WIDTH-1:0]  end_node_idx;
 
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] mid0_node_accum;
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] mid1_node_accum;
     reg [PARAM_ACCUM_VAL_WIDTH-1:0] end_node_accum;
 
     reg                             wr_start_node;
@@ -79,14 +82,16 @@ module digital_top
 
             end_node_accum <= 'd0;
         end else if (wr_start_node) begin
-            start_node_idx <= next_node_idx;
+            start_node_idx  <= next_node_idx;
         end else if (wr_mid0_node) begin
-            mid0_node_idx  <= next_node_idx;
+            mid0_node_idx   <= next_node_idx;
+            mid0_node_accum <= accum_result;
         end else if (wr_mid1_node) begin
-            mid1_node_idx  <= next_node_idx;
+            mid1_node_idx   <= next_node_idx;
+            mid1_node_accum <= accum_result;
         end else if (wr_end_node) begin
-            end_node_idx   <= next_node_idx;
-            end_node_accum <= accum_result;
+            end_node_idx    <= next_node_idx;
+            end_node_accum  <= accum_result;
         end
     end
 
@@ -96,7 +101,7 @@ module digital_top
 
     reg [PARAM_ACCUM_VAL_WIDTH-1:0] accum_input0;
     reg [PARAM_ACCUM_VAL_WIDTH-1:0] accum_input1;
-    reg [1:0] accum_input0_sel;
+    reg [2:0] accum_input0_sel;
     reg [1:0] accum_input1_sel;
 
     reg [$clog2(PARAM_FIFO_DEPTH)-1:0] prev_fifo_rd_ptr;
@@ -106,26 +111,28 @@ module digital_top
 
     always@(*) begin
         case (accum_input0_sel)
-            `ZERO_VAL_SEL           : accum_input0 = 'd0;
-            `FIFO_WR_VAL_SEL        : accum_input0 = fifo_accum_val[fifo_wr_ptr];
-            `FIFO_DIRECT_WR_VAL_SEL : accum_input0 = fifo_accum_val[fifo_direct_wr_ptr];
-            `END_NODE_SEL           : accum_input0 = end_node_accum;
+            `ZERO_IN0_SEL           : accum_input0 = 'd0;
+            `FIFO_WR_IN0_SEL        : accum_input0 = fifo_accum_val[fifo_wr_ptr];
+            `FIFO_DIRECT_WR_IN0_SEL : accum_input0 = fifo_accum_val[fifo_direct_wr_ptr];
+            `MID0_NODE_IN0_SEL      : accum_input0 = mid0_node_accum;
+            `MID1_NODE_IN0_SEL      : accum_input0 = mid1_node_accum;
+            `END_NODE_IN0_SEL       : accum_input0 = end_node_accum;
             default                 : accum_input0 = 'd0;
         endcase
     end
 
     always@(*) begin
         case (accum_input1_sel)
-            `ZERO_VAL_SEL    : accum_input1 = 'd0;
-            `ONE_VAL_SEL     : accum_input1 = 'd1;
-            `FIFO_RD_VAL_SEL : accum_input1 = fifo_accum_val[fifo_rd_ptr];
+            `ZERO_IN1_SEL    : accum_input1 = 'd0;
+            `ONE_IN1_SEL     : accum_input1 = 'd1;
+            `FIFO_RD_IN1_SEL : accum_input1 = fifo_accum_val[fifo_rd_ptr];
                                // Points to the last read register in the FIFO to avoid
                                //   needing to save the value to another register.
                                // This is valid because read values don't get flushed
                                // This is also valid even when FIFO is full, but not
                                //   when it overflows because the selected register
                                //   gets overwritten during the cycle when the FIFO would be full
-            `FIFO_PREV_RD_VAL_SEL : accum_input1 = fifo_accum_val[prev_fifo_rd_ptr];
+            `FIFO_PREV_RD_IN1_SEL : accum_input1 = fifo_accum_val[prev_fifo_rd_ptr];
             default          : accum_input1 = 'd0;
         endcase
     end
@@ -253,8 +260,8 @@ module digital_top
         wr_mid1_node  = 1'b0;
         wr_end_node   = 1'b0;
 
-        accum_input0_sel = `ZERO_VAL_SEL;
-        accum_input1_sel = `ZERO_VAL_SEL;
+        accum_input0_sel = `ZERO_IN0_SEL;
+        accum_input1_sel = `ZERO_IN1_SEL;
 
         enable_check = 1'b0;
 
@@ -272,8 +279,8 @@ module digital_top
                 wr_start_node = 1'b1;
 
                 // Initialize start node with 1
-                accum_input0_sel = `ZERO_VAL_SEL;
-                accum_input1_sel = `ONE_VAL_SEL;
+                accum_input0_sel = `ZERO_IN0_SEL;
+                accum_input1_sel = `ONE_IN1_SEL;
 
                 // For part 1, skip fetching of middle nodes
                 next_state = (part_sel == `PART1_SEL) ? `FETCH_END_NODE : `FETCH_MID0_NODE;
@@ -293,8 +300,8 @@ module digital_top
                 wr_end_node = 1'b1;
 
                 // Initialize end node with 0
-                accum_input0_sel = `ZERO_VAL_SEL;
-                accum_input1_sel = `ZERO_VAL_SEL;
+                accum_input0_sel = `ZERO_IN0_SEL;
+                accum_input1_sel = `ZERO_IN1_SEL;
 
                 // Prepare to register node_idx_reg for fetching
                 //   during POP_CURR_NODE state, and assert read control
@@ -309,8 +316,8 @@ module digital_top
 
                 // Prepare the accumulator inputs for pushing
                 //   to the FIFO in PUSH_NEXT_NODE state
-                accum_input0_sel = `FIFO_WR_VAL_SEL;
-                accum_input1_sel = `FIFO_RD_VAL_SEL;
+                accum_input0_sel = `FIFO_WR_IN0_SEL;
+                accum_input1_sel = `FIFO_RD_IN1_SEL;
 
                 if (fifo_empty) begin
                     next_state = `OUTPUT_RESULT;
@@ -330,23 +337,23 @@ module digital_top
                     wr_end_node = 1'b1;
 
                     // Use the existing value of the end node accumulator
-                    accum_input0_sel = `END_NODE_SEL;
-                    accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                    accum_input0_sel = `END_NODE_IN0_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_IN1_SEL;
                 end else if (next_node_idx_present) begin
                     // Enable direct write to where next_node_idx is present in the FIFO
                     fifo_direct_wr_en = 1'b1;
 
                     // Use the existing value of the FIFO data
-                    accum_input0_sel = `FIFO_DIRECT_WR_VAL_SEL;
-                    accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                    accum_input0_sel = `FIFO_DIRECT_WR_IN0_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_IN1_SEL;
                 end else begin
                     // Push the next node
                     fifo_wr_en = 1'b1;
 
                     // Pushing new nodes so we only need to copy the accumulated
                     //   value from the previous node
-                    accum_input0_sel = `ZERO_VAL_SEL;
-                    accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                    accum_input0_sel = `ZERO_IN0_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_IN1_SEL;
                 end
 
                 // If FIFO is already empty, and it wasn't due to popping the starting node,
