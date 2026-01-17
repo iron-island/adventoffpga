@@ -174,6 +174,7 @@ module digital_top
     // Logic for checking presence of node index in FIFO
     reg [PARAM_NODE_IDX_WIDTH-1:0] next_node_idx_buf;
     reg                            next_node_idx_present;
+    reg                            enable_check;
 
     always@(*) begin
         fifo_direct_wr_ptr    = 'd0;
@@ -181,12 +182,12 @@ module digital_top
 
         for (int j = 0; j < PARAM_FIFO_DEPTH; j++) begin
             // Confirm that node index already exists in the FIFO based on 3 conditions:
-            //   1. FIFO data at pointer j is valid
-            //   2. Node index is not the same as the buffered version because buffered
-            //        version just got pushed
+            //   1. Current state is PUSH_NEXT_NODE, signaled by enable_check, can be removed but
+            //        this reduces the activity on when checking is done
+            //   2. FIFO data at pointer j is valid
             //   3. FIFO node index at pointer j matches
-            if ((fifo_valid[j[$clog2(PARAM_FIFO_DEPTH)-1:0]]) &
-                (next_node_idx != next_node_idx_buf ) &
+            if (enable_check &
+                (fifo_valid[j[$clog2(PARAM_FIFO_DEPTH)-1:0]]) &
                 (fifo_node_idx[j[$clog2(PARAM_FIFO_DEPTH)-1:0]] == next_node_idx)) begin
                 fifo_direct_wr_ptr    = j[$clog2(PARAM_FIFO_DEPTH)-1:0];
                 next_node_idx_present = 1'b1;
@@ -236,6 +237,8 @@ module digital_top
 
         accum_input0_sel = `ZERO_VAL_SEL;
         accum_input1_sel = `ZERO_VAL_SEL;
+
+        enable_check = 1'b0;
 
         node_idx = node_idx_reg;
         rd_next_node = rd_next_node_reg;
@@ -290,6 +293,9 @@ module digital_top
                 end
             end
             `PUSH_NEXT_NODE   : begin
+                // Enable checking if node index already exists in the FIFO
+                enable_check = 1'b1;
+
                 // If the received node index matches the end node index
                 if ((next_node_idx == end_node_idx)) begin
                     // Write to the end node registers
