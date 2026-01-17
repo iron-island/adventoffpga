@@ -70,7 +70,11 @@ def update_tb_node_strings(dut, curr_node, next_node):
 
     if (curr_node != ""):
         dut.curr_node_string.value = node_str2int(curr_node)
-    dut.next_node_string.value = node_str2int(next_node)
+    
+    if (next_node == "x"):
+        dut.next_node_string.value = node_str2int("  x")
+    else:
+        dut.next_node_string.value = node_str2int(next_node)
 
 #--------------
 # cocotb Tests
@@ -160,8 +164,16 @@ async def part1_test(dut):
     while (dut.rd_next_node_reg.value) and (count < timeout_count):
         count += 1
 
+
+        # Drive counter to 0 first, since data about the target nodes
+        #   including the count would only be available on succeeding
+        #   cycles. This testbench assumes only 1 cycle to read
+        #   from memory
         node_idx = int(dut.node_idx_reg.value)
         node = idx_node_dict[node_idx]
+        update_tb_node_strings(dut, node, "x")
+        await FallingEdge(dut.clk)
+        
         next_node_count = len(graph_dict[node])
         for next_node in graph_dict[node]:
             # Convert to node index
