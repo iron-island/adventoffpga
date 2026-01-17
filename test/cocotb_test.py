@@ -3,11 +3,16 @@
 
 import cocotb
 from cocotb.triggers import RisingEdge, FallingEdge, Timer
+from functools import cache
 
 import pprint
 
 CLK_PERIOD_NS = 10
 INPUT_FILE = "../input/input.txt"
+
+# Dictionary for the graph as a global variable for easier caching
+#   of dfs_part1() function
+graph_dict = {}
 
 #---------------------------------
 # Native Python Utility Functions
@@ -16,7 +21,6 @@ INPUT_FILE = "../input/input.txt"
 # Function for parsing the puzzle input file and outputting a dictionary
 #   to represent the graph
 def parse_input(in_file):
-    graph_dict = {}
 
     with open(in_file) as file:
         line = file.readline()
@@ -34,6 +38,21 @@ def parse_input(in_file):
 
     return graph_dict
 
+# Solution to part 1 using DFS with memoization
+@cache
+def dfs_part1(node):
+
+    # Base case
+    if (node == "out"):
+        return 1
+
+    num = 0
+    for next_node in graph_dict[node]:
+        num += dfs_part1(next_node)
+
+    return num
+
+# Convert node name string to integer
 def node_str2int(node):
     # The nodes are 3 characters, so interpret each character as 8-bit ASCII
     return (ord(node[0]) << 16) + (ord(node[1]) << 8) + (ord(node[2]))
@@ -159,12 +178,7 @@ async def part1_test(dut):
 
     # Drive target nodes
     #await FallingEdge(dut.clk)
-    timeout_count = 500 # TODO: remove once design can flag its done
-    count = 0
-    while (dut.rd_next_node_reg.value) and (count < timeout_count):
-        count += 1
-
-
+    while (dut.rd_next_node_reg.value) and (dut.done_reg.value == 0):
         # Drive counter to 0 first, since data about the target nodes
         #   including the count would only be available on succeeding
         #   cycles. This testbench assumes only 1 cycle to read
@@ -189,7 +203,12 @@ async def part1_test(dut):
 
             await FallingEdge(dut.clk)
 
-    # TODO
+    # Check answer using software solution to part 1
+    part1_ans_exp = dfs_part1("you")
+    dut_part1_ans = dut.part1_ans.value
+    cocotb.log.info(f'Part 1 expected answer from software: {part1_ans_exp}')
+    cocotb.log.info(f'Part 1 computed answer from hardware: {int(dut_part1_ans)}')
+    assert(dut_part1_ans == part1_ans_exp)
 
     # Wait for a few clock cycles before simulation ends
     await Timer(10*CLK_PERIOD_NS, unit="ns")
