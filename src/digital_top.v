@@ -10,7 +10,12 @@
 
 // Part 1 or 2 selection
 `define PART1_SEL 1'b0
-`define PART2_SEL 1'b1
+`define PART2_SEL 1'b1 // not used, but added for completeness
+
+// For Part 2 iteration count
+`define PART2_ITER_MID0 2'b00
+`define PART2_ITER_MID1 2'b01
+`define PART2_ITER_END  2'b11
 
 // Accumulator selects, some values
 //   are repeated because they get used
@@ -228,19 +233,39 @@ module digital_top
     reg [2:0] curr_state;
     reg [2:0] next_state;
 
+    reg [1:0] curr_part2_iter;
+    reg [1:0] next_part2_iter;
+
     reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx;
     reg                            rd_next_node;
     reg                            done;
 
+    reg part1_selected;
+    reg part2_selected;
+    reg part2_iter_mid0_selected;
+    reg part2_iter_mid1_selected;
+    reg part2_iter_end_selected;
+
+    assign part1_selected = (part_sel == `PART1_SEL);
+    assign part2_selected = !part1_selected;
+
+    assign part2_iter_mid0_selected = (part2_selected & (curr_part2_iter == `PART2_ITER_MID0));
+    assign part2_iter_mid1_selected = (part2_selected & (curr_part2_iter == `PART2_ITER_MID1));
+    assign part2_iter_end_selected  = (part2_selected & (curr_part2_iter == `PART2_ITER_END));
+
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             curr_state <= `IDLE;
+
+            curr_part2_iter  <= `PART2_ITER_MID0;
 
             node_idx_reg     <= 'd0;
             rd_next_node_reg <= 'd0;
             done_reg         <= 'd0;
         end else if (start_run) begin
             curr_state <= next_state;
+
+            curr_part2_iter  <= next_part2_iter;
 
             node_idx_reg     <= node_idx;
             rd_next_node_reg <= rd_next_node;
@@ -250,6 +275,8 @@ module digital_top
 
     always@(*) begin
         // default values
+        next_part2_iter = curr_part2_iter;
+
         fifo_wr_en = 1'b0;
         fifo_rd_en = 1'b0;
 
@@ -283,7 +310,7 @@ module digital_top
                 accum_input1_sel = `ONE_IN1_SEL;
 
                 // For part 1, skip fetching of middle nodes
-                next_state = (part_sel == `PART1_SEL) ? `FETCH_END_NODE : `FETCH_MID0_NODE;
+                next_state = (part1_selected) ? `FETCH_END_NODE : `FETCH_MID0_NODE;
             end
             `FETCH_MID0_NODE : begin
                 wr_mid0_node = 1'b1;
@@ -331,13 +358,28 @@ module digital_top
                 // Enable checking if node index already exists in the FIFO
                 enable_check = 1'b1;
 
-                // If the received node index matches the end node index
-                if ((next_node_idx == end_node_idx)) begin
+                // If the received node index matches the middle or end node indices
+                if ((next_node_idx == end_node_idx) &
+                    (part1_selected | part2_iter_end_selected)) begin
                     // Write to the end node registers
                     wr_end_node = 1'b1;
 
-                    // Use the existing value of the end node accumulator
+                    // Use the existing value of the end node register
                     accum_input0_sel = `END_NODE_IN0_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_IN1_SEL;
+                end else if ((next_node_idx == mid0_node_idx) & part2_iter_mid0_selected) begin
+                    // Write to the mid0 node registers
+                    wr_mid0_node = 1'b1;
+
+                    // Use the existing value of the mid0 node register
+                    accum_input0_sel = `MID0_NODE_IN0_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_IN1_SEL;
+                end else if ((next_node_idx == mid1_node_idx) & part2_iter_mid1_selected) begin
+                    // Write to the mid1 node registers
+                    wr_mid1_node = 1'b1;
+
+                    // Use the existing value of the mid1 node register
+                    accum_input0_sel = `MID1_NODE_IN0_SEL;
                     accum_input1_sel = `FIFO_PREV_RD_IN1_SEL;
                 end else if (next_node_idx_present) begin
                     // Enable direct write to where next_node_idx is present in the FIFO
