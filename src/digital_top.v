@@ -291,7 +291,7 @@ module digital_top
             end
             `PUSH_NEXT_NODE   : begin
                 // If the received node index matches the end node index
-                if ((next_node_idx == end_node_idx) & (fifo_node_idx[fifo_rd_ptr] != start_node_idx)) begin
+                if ((next_node_idx == end_node_idx)) begin
                     // Write to the end node registers
                     wr_end_node = 1'b1;
 
