@@ -41,21 +41,29 @@ module digital_top
     output reg [PARAM_NODE_IDX_WIDTH-1:0]  node_idx_reg,
     output reg                             rd_next_node_reg,
     input      [PARAM_NODE_IDX_WIDTH-1:0]  next_node_idx,
-    input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter // TODO: check max number of edges
+    input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter, // TODO: check max number of edges
+
+    output reg                             done_reg
 );
 
     // Registers with specialized functions
+    reg [PARAM_NODE_IDX_WIDTH-1:0]  start_node_idx;
     reg [PARAM_ACCUM_VAL_WIDTH-1:0] end_node_accum;
     reg [PARAM_NODE_IDX_WIDTH-1:0]  end_node_idx;
+    reg                             wr_start_node;
     reg                             wr_end_node;
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
+            start_node_idx <= 'd0;
+
             end_node_idx   <= 'd0;
             end_node_accum <= 'd0;
         end else if (wr_end_node) begin
             end_node_idx   <= next_node_idx;
             end_node_accum <= accum_result;
+        end else if (wr_start_node) begin
+            start_node_idx <= next_node_idx;
         end
     end
 
@@ -192,6 +200,7 @@ module digital_top
 
     reg [PARAM_NODE_IDX_WIDTH-1:0] node_idx;
     reg                            rd_next_node;
+    reg                            done;
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -199,6 +208,7 @@ module digital_top
 
             node_idx_reg     <= 'd0;
             rd_next_node_reg <= 'd0;
+            done_reg         <= 'd0;
 
             next_node_idx_buf <= 'd0;
         end else if (start_run) begin
@@ -206,6 +216,7 @@ module digital_top
 
             node_idx_reg     <= node_idx;
             rd_next_node_reg <= rd_next_node;
+            done_reg         <= done;
 
             // Buffer the next_node_idx input to be used to invalidate
             //   existence checking
@@ -220,21 +231,24 @@ module digital_top
 
         fifo_direct_wr_en = 1'b0;
 
-        wr_end_node = 1'b0;
+        wr_start_node = 1'b0;
+        wr_end_node   = 1'b0;
 
         accum_input0_sel = `ZERO_VAL_SEL;
         accum_input1_sel = `ZERO_VAL_SEL;
 
         node_idx = node_idx_reg;
         rd_next_node = rd_next_node_reg;
+        done = done_reg;
 
         case (curr_state)
             `IDLE             : begin
-                next_state = `FETCH_START_NODE;
+                next_state = (done_reg) ? `IDLE : `FETCH_START_NODE;
             end
             `FETCH_START_NODE : begin
                 // FIFO is used for the start node
                 fifo_wr_en = 1'b1;
+                wr_start_node = 1'b1;
 
                 // Initialize start node with 1
                 accum_input0_sel = `ZERO_VAL_SEL;
@@ -266,11 +280,18 @@ module digital_top
                 accum_input0_sel = `FIFO_WR_VAL_SEL;
                 accum_input1_sel = `FIFO_RD_VAL_SEL;
 
-                next_state = `PUSH_NEXT_NODE;
+                // TODO
+                if (fifo_empty) begin
+                    next_state = `OUTPUT_RESULT;
+
+                    done = 1'b1;
+                end else begin
+                    next_state = `PUSH_NEXT_NODE;
+                end
             end
             `PUSH_NEXT_NODE   : begin
                 // If the received node index matches the end node index
-                if (next_node_idx == end_node_idx) begin
+                if ((next_node_idx == end_node_idx) & (fifo_node_idx[fifo_rd_ptr] != start_node_idx)) begin
                     // Write to the end node registers
                     wr_end_node = 1'b1;
 
@@ -306,7 +327,9 @@ module digital_top
                     next_state = `PUSH_NEXT_NODE;
                 end
             end
-            // TODO: other states
+            `OUTPUT_RESULT : begin
+                next_state = `IDLE;
+            end
             default           : begin
                 // Added for lint
                 fifo_wr_en = 1'b0;
