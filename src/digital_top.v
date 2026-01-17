@@ -283,7 +283,6 @@ module digital_top
                 accum_input0_sel = `FIFO_WR_VAL_SEL;
                 accum_input1_sel = `FIFO_RD_VAL_SEL;
 
-                // TODO
                 if (fifo_empty) begin
                     next_state = `OUTPUT_RESULT;
 
@@ -321,9 +320,16 @@ module digital_top
                     accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
                 end
 
+                // If FIFO is already empty, and it wasn't due to popping the starting node,
+                //   output is done
+                if (fifo_empty & (node_idx_reg != start_node_idx)) begin
+                    next_state = `OUTPUT_RESULT;
+
+                    done = 1'b1;
+
                 // If on the last next_node_idx, go back to popping the queue,
                 //   otherwise there are more next_node_idx so keep pushing
-                if (next_node_counter == 'd1) begin
+                end if (next_node_counter == 'd1) begin
                     // Prepare to register node_idx_reg for fetching
                     //   during POP_CURR_NODE state
                     node_idx = fifo_node_idx[fifo_rd_ptr];
