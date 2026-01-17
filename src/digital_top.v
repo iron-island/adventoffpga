@@ -28,9 +28,12 @@
 module digital_top
 #(
     parameter PARAM_NODE_IDX_WIDTH  = 10,
-    parameter PARAM_COUNTER_WIDTH   = 4,
+    parameter PARAM_COUNTER_WIDTH   = 5,   // Part 1, 4 is enough, Part 2 needs 5
     parameter PARAM_ACCUM_VAL_WIDTH = 24,
-    parameter PARAM_FIFO_DEPTH      = 32
+    parameter PARAM_FIFO_DEPTH      = 128  // For part 1, depth of 32 is enough
+                                           // For part 2, depth of 128 is needed,
+                                           //   assuming we are restricted to a
+                                           //   power of 2
 ) (
     input                                  clk,
     input                                  rst_n,
