@@ -1,12 +1,16 @@
 // FSM states
 `define IDLE             3'b000
 `define FETCH_START_NODE 3'b001
-`define FETCH_END_NODE   3'b010
-`define POP_CURR_NODE    3'b011
-`define PUSH_NEXT_NODE   3'b100
-`define RUN_MUL          3'b101
-`define RUN_MAC          3'b110
+`define FETCH_MID0_NODE  3'b010
+`define FETCH_MID1_NODE  3'b011
+`define FETCH_END_NODE   3'b100
+`define POP_CURR_NODE    3'b101
+`define PUSH_NEXT_NODE   3'b110
 `define OUTPUT_RESULT    3'b111
+
+// Part 1 or 2 selection
+`define PART1_SEL 1'b0
+`define PART2_SEL 1'b1
 
 // Accumulator selects, some values
 //   are repeated because they get used
@@ -55,22 +59,34 @@ module digital_top
 
     // Registers with specialized functions
     reg [PARAM_NODE_IDX_WIDTH-1:0]  start_node_idx;
-    reg [PARAM_ACCUM_VAL_WIDTH-1:0] end_node_accum;
+    reg [PARAM_NODE_IDX_WIDTH-1:0]  mid0_node_idx;
+    reg [PARAM_NODE_IDX_WIDTH-1:0]  mid1_node_idx;
     reg [PARAM_NODE_IDX_WIDTH-1:0]  end_node_idx;
+
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] end_node_accum;
+
     reg                             wr_start_node;
+    reg                             wr_mid0_node;
+    reg                             wr_mid1_node;
     reg                             wr_end_node;
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             start_node_idx <= 'd0;
-
+            mid0_node_idx  <= 'd0;
+            mid1_node_idx  <= 'd0;
             end_node_idx   <= 'd0;
+
             end_node_accum <= 'd0;
+        end else if (wr_start_node) begin
+            start_node_idx <= next_node_idx;
+        end else if (wr_mid0_node) begin
+            mid0_node_idx  <= next_node_idx;
+        end else if (wr_mid1_node) begin
+            mid1_node_idx  <= next_node_idx;
         end else if (wr_end_node) begin
             end_node_idx   <= next_node_idx;
             end_node_accum <= accum_result;
-        end else if (wr_start_node) begin
-            start_node_idx <= next_node_idx;
         end
     end
 
@@ -233,6 +249,8 @@ module digital_top
         fifo_direct_wr_en = 1'b0;
 
         wr_start_node = 1'b0;
+        wr_mid0_node  = 1'b0;
+        wr_mid1_node  = 1'b0;
         wr_end_node   = 1'b0;
 
         accum_input0_sel = `ZERO_VAL_SEL;
@@ -256,6 +274,17 @@ module digital_top
                 // Initialize start node with 1
                 accum_input0_sel = `ZERO_VAL_SEL;
                 accum_input1_sel = `ONE_VAL_SEL;
+
+                // For part 1, skip fetching of middle nodes
+                next_state = (part_sel == `PART1_SEL) ? `FETCH_END_NODE : `FETCH_MID0_NODE;
+            end
+            `FETCH_MID0_NODE : begin
+                wr_mid0_node = 1'b1;
+
+                next_state = `FETCH_MID1_NODE;
+            end
+            `FETCH_MID1_NODE : begin
+                wr_mid1_node = 1'b1;
 
                 next_state = `FETCH_END_NODE;
             end
