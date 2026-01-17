@@ -167,11 +167,11 @@ module digital_top
 
     // Logic for checking presence of node index in FIFO
     reg [PARAM_NODE_IDX_WIDTH-1:0] next_node_idx_buf;
-    reg                            node_idx_present;
+    reg                            next_node_idx_present;
 
     always@(*) begin
-        fifo_direct_wr_ptr = 'd0;
-        node_idx_present   = 1'b0;
+        fifo_direct_wr_ptr    = 'd0;
+        next_node_idx_present = 1'b0;
 
         for (int j = 0; j < PARAM_FIFO_DEPTH; j++) begin
             // Confirm that node index already exists in the FIFO based on 3 conditions:
@@ -182,8 +182,8 @@ module digital_top
             if ((fifo_valid[j[$clog2(PARAM_FIFO_DEPTH)-1:0]]) &
                 (next_node_idx != next_node_idx_buf ) &
                 (fifo_node_idx[j[$clog2(PARAM_FIFO_DEPTH)-1:0]] == next_node_idx)) begin
-                fifo_direct_wr_ptr = j[$clog2(PARAM_FIFO_DEPTH)-1:0];
-                node_idx_present   = 1'b1;
+                fifo_direct_wr_ptr    = j[$clog2(PARAM_FIFO_DEPTH)-1:0];
+                next_node_idx_present = 1'b1;
             end
         end
     end
@@ -271,14 +271,22 @@ module digital_top
                 next_state = `PUSH_NEXT_NODE;
             end
             `PUSH_NEXT_NODE   : begin
-                // TODO: logic for checking if next_node_idx already exists in the FIFO
-                // Push the next node
-                fifo_wr_en = 1'b1;
+                if (next_node_idx_present) begin
+                    // Enable direct write to where next_node_idx is present in the FIFO
+                    fifo_direct_wr_en = 1'b1;
 
-                // Pushing new nodes so we only need to copy the accumulated
-                //   value from the previous node
-                accum_input0_sel = `ZERO_VAL_SEL;
-                accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                    // Use the existing value of the FIFO data
+                    accum_input0_sel = `FIFO_DIRECT_WR_VAL_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                end else begin
+                    // Push the next node
+                    fifo_wr_en = 1'b1;
+
+                    // Pushing new nodes so we only need to copy the accumulated
+                    //   value from the previous node
+                    accum_input0_sel = `ZERO_VAL_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                end
 
                 // If on the last next_node_idx, go back to popping the queue,
                 //   otherwise there are more next_node_idx so keep pushing
