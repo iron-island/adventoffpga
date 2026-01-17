@@ -172,7 +172,6 @@ module digital_top
     end
 
     // Logic for checking presence of node index in FIFO
-    reg [PARAM_NODE_IDX_WIDTH-1:0] next_node_idx_buf;
     reg                            next_node_idx_present;
     reg                            enable_check;
 
@@ -210,18 +209,12 @@ module digital_top
             node_idx_reg     <= 'd0;
             rd_next_node_reg <= 'd0;
             done_reg         <= 'd0;
-
-            next_node_idx_buf <= 'd0;
         end else if (start_run) begin
             curr_state <= next_state;
 
             node_idx_reg     <= node_idx;
             rd_next_node_reg <= rd_next_node;
             done_reg         <= done;
-
-            // Buffer the next_node_idx input to be used to invalidate
-            //   existence checking
-            next_node_idx_buf <= next_node_idx;
         end
     end
 
