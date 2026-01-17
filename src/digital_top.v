@@ -51,11 +51,11 @@ module digital_top
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
+            end_node_idx   <= 'd0;
             end_node_accum <= 'd0;
         end else if (wr_end_node) begin
-            // TODO: end node accumulator
-
-            end_node_idx <= next_node_idx;
+            end_node_idx   <= next_node_idx;
+            end_node_accum <= accum_result;
         end
     end
 
@@ -139,8 +139,6 @@ module digital_top
             // Currently, simultaneous reads and writes aren't needed
             case (1'b1)
                 fifo_wr_en   : begin
-                    // TODO: Add node_idx checking for fifo_node_idx, where fifo_accum_val would no
-                    //         longer depend on write pointer
                     fifo_accum_val[fifo_wr_ptr] <= accum_result;
                     fifo_node_idx[fifo_wr_ptr]  <= next_node_idx;
                     fifo_valid[fifo_wr_ptr]     <= 1'b1;
@@ -249,7 +247,7 @@ module digital_top
                 wr_end_node = 1'b1;
 
                 // Initialize end node with 0
-                accum_input0_sel = `END_NODE_SEL;
+                accum_input0_sel = `ZERO_VAL_SEL;
                 accum_input1_sel = `ZERO_VAL_SEL;
 
                 // Prepare to register node_idx_reg for fetching
@@ -271,7 +269,15 @@ module digital_top
                 next_state = `PUSH_NEXT_NODE;
             end
             `PUSH_NEXT_NODE   : begin
-                if (next_node_idx_present) begin
+                // If the received node index matches the end node index
+                if (next_node_idx == end_node_idx) begin
+                    // Write to the end node registers
+                    wr_end_node = 1'b1;
+
+                    // Use the existing value of the end node accumulator
+                    accum_input0_sel = `END_NODE_SEL;
+                    accum_input1_sel = `FIFO_PREV_RD_VAL_SEL;
+                end else if (next_node_idx_present) begin
                     // Enable direct write to where next_node_idx is present in the FIFO
                     fifo_direct_wr_en = 1'b1;
 
