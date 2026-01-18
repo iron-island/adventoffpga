@@ -22,6 +22,12 @@ The Verilog RTL top module is found in `src/digital_top.v`.
    - The `WAVES=1` option allows a `tb.vcd` file to be dumped inside the same directory
    - The test should `PASS` and print the part 1 and part 2 answers from both the design and the testbench
 
+# Results
+
+Using my puzzle input and a 100MHz (10ns period) clock input `clk`, starting from reset deassertion `rst_n` up to `done_reg` assertion the time to solve each part is:
+1. Part 1: 3.38us (338 `clk` cycles)
+2. Part 2: 121.220us (12,122 `clk` cycles)
+
 # Design
 
 ## Advent of Code 2025 Day 11
