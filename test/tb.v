@@ -10,6 +10,7 @@ module tb ();
     parameter PARAM_NODE_IDX_WIDTH  = 10;
     parameter PARAM_COUNTER_WIDTH   = 5;   // Part 1, 4 is enough, Part 2 needs 5
     parameter PARAM_ACCUM_VAL_WIDTH = 24;
+    parameter PARAM_PROD_VAL_WIDTH  = 49;
     parameter PARAM_FIFO_DEPTH      = 128; // For part 1, depth of 32 is enough
                                            // For part 2, depth of 128 is needed,
                                            //   assuming we are restricted to a
@@ -36,6 +37,7 @@ module tb ();
     reg [PARAM_COUNTER_WIDTH-1:0]  next_node_counter;
 
     reg [PARAM_ACCUM_VAL_WIDTH-1:0] part1_ans;
+    reg [PARAM_PROD_VAL_WIDTH-1:0]  part2_ans;
     reg                             done_reg;
 
     // Testbench variables for logging nodes as 3-character strings
@@ -56,6 +58,7 @@ module tb ();
         .next_node_counter(next_node_counter),
 
         .part1_ans(part1_ans),
+        .part2_ans(part2_ans),
         .done_reg(done_reg)
     );
 
