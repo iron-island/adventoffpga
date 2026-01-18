@@ -52,6 +52,22 @@ def dfs_part1(node):
 
     return num
 
+# Solution to part 2 using DFS with memoization
+@cache
+def dfs_part2(node, end_node, black_list):
+
+    # Base case
+    if (node in black_list):
+        return 0
+    if (node == end_node):
+        return 1
+
+    num = 0
+    for next_node in graph_dict[node]:
+        num += dfs_part2(next_node, end_node, black_list)
+
+    return num
+
 # Convert node name string to integer
 def node_str2int(node):
     # The nodes are 3 characters, so interpret each character as 8-bit ASCII
@@ -209,8 +225,7 @@ async def part1_part2_test(dut):
         assert(dut.dut.end_node_idx.value == end_node_idx_exp)
 
         # Drive target nodes
-        #await FallingEdge(dut.clk)
-        while (dut.rd_next_node_reg.value) and (dut.done_reg.value == 0):
+        while (dut.rd_next_node_reg.value):
             # Drive counter to 0 first, since data about the target nodes
             #   including the count would only be available on succeeding
             #   cycles. This testbench assumes only 1 cycle to read
@@ -235,13 +250,28 @@ async def part1_part2_test(dut):
 
                 await FallingEdge(dut.clk)
 
-        # Check answer using software solution to part 1
+        # Wait for done flag to assert
+        while (dut.done_reg.value == 0):
+            await FallingEdge(dut.clk)
+
+        # Check answer using software solutions
         if (part_sel == 0):
             part1_ans_exp = dfs_part1(start_node)
+
             dut_part1_ans = dut.part_ans.value
             cocotb.log.info(f'Part 1 expected answer from software: {part1_ans_exp}')
             cocotb.log.info(f'Part 1 computed answer from hardware: {int(dut_part1_ans)}')
             assert(dut_part1_ans == part1_ans_exp)
+        elif (part_sel == 1):
+            start_mid0 = dfs_part2(start_node, mid0_node, tuple([mid1_node, end_node]))
+            mid0_mid1  = dfs_part2(mid0_node, mid1_node, tuple([end_node]))
+            mid1_end   = dfs_part2(mid1_node, end_node, tuple())
+            part2_ans_exp = start_mid0*mid0_mid1*mid1_end
+
+            dut_part2_ans = dut.part_ans.value
+            cocotb.log.info(f'Part 2 expected answer from software: {part2_ans_exp}')
+            cocotb.log.info(f'Part 2 computed answer from hardware: {int(dut_part2_ans)}')
+            assert(dut_part2_ans == part2_ans_exp)
 
     # Wait for a few clock cycles before simulation ends
     await Timer(10*CLK_PERIOD_NS, unit="ns")
