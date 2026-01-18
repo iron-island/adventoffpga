@@ -1,12 +1,13 @@
 // FSM states
-`define IDLE             3'b000
-`define FETCH_START_NODE 3'b001
-`define FETCH_MID0_NODE  3'b010
-`define FETCH_MID1_NODE  3'b011
-`define FETCH_END_NODE   3'b100
-`define POP_CURR_NODE    3'b101
-`define PUSH_NEXT_NODE   3'b110
-`define END_BFS_ITER     3'b111
+`define IDLE             4'd0
+`define FETCH_START_NODE 4'd1
+`define FETCH_MID0_NODE  4'd2
+`define FETCH_MID1_NODE  4'd3
+`define FETCH_END_NODE   4'd4
+`define POP_CURR_NODE    4'd5
+`define PUSH_NEXT_NODE   4'd6
+`define END_BFS_ITER     4'd7
+`define END_MUL          4'd8
 
 // Part 1 or 2 selection
 `define PART1_SEL 1'b0
@@ -39,11 +40,23 @@
 `define FIFO_PUSH_MID0 2'b01
 `define FIFO_PUSH_MID1 2'b10
 
+// Multiplier selects
+// For mul_input0_sel
+`define ZERO_MUL_IN0_SEL      2'b00
+`define MID0_NODE_MUL_IN0_SEL 2'b01
+`define PROD_MUL_IN0_SEL      2'b10
+
+// For mul_input1_sel
+`define ZERO_MUL_IN1_SEL      2'b00
+`define MID1_NODE_MUL_IN1_SEL 2'b01
+`define END_NODE_MUL_IN1_SEL  2'b10
+
 module digital_top
 #(
     parameter PARAM_NODE_IDX_WIDTH  = 10,
     parameter PARAM_COUNTER_WIDTH   = 5,   // Part 1, 4 is enough, Part 2 needs 5
     parameter PARAM_ACCUM_VAL_WIDTH = 24,
+    parameter PARAM_PROD_VAL_WIDTH  = 49,
     parameter PARAM_FIFO_DEPTH      = 128  // For part 1, depth of 32 is enough
                                            // For part 2, depth of 128 is needed,
                                            //   assuming we are restricted to a
@@ -61,11 +74,15 @@ module digital_top
     input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter, // TODO: check max number of edges
 
     output reg [PARAM_ACCUM_VAL_WIDTH-1:0] part1_ans,
+    output reg [PARAM_PROD_VAL_WIDTH-1:0]  part2_ans,
     output reg                             done_reg
 );
 
     // Part 1: Answer is the end node accumulated value
     assign part1_ans = end_node_accum;
+
+    // Part 2: Answer is the product register value
+    assign part2_ans = prod_reg;
 
     // Registers with specialized functions
     reg [PARAM_NODE_IDX_WIDTH-1:0]  start_node_idx;
@@ -81,6 +98,7 @@ module digital_top
     reg                             wr_mid0_node;
     reg                             wr_mid1_node;
     reg                             wr_end_node;
+    reg                             wr_prod;
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -101,6 +119,49 @@ module digital_top
         end else if (wr_end_node) begin
             end_node_idx    <= next_node_idx;
             end_node_accum  <= accum_result;
+        end
+    end
+
+    // Multiplier
+    wire [PARAM_PROD_VAL_WIDTH-1:0] prod_result;
+
+    reg [PARAM_PROD_VAL_WIDTH-1:0] prod_reg;
+
+    // Same width as product register since this uses it as as input,
+    //   but can be reduced since this only uses the partial product
+    reg [PARAM_PROD_VAL_WIDTH-1:0]  mul_input0;
+    // Same width as the accumulators since it only uses them as input
+    reg [PARAM_ACCUM_VAL_WIDTH-1:0] mul_input1;
+
+    reg [1:0] mul_input0_sel;
+    reg [1:0] mul_input1_sel;
+
+    always@(*) begin
+        case (mul_input0_sel)
+            `ZERO_MUL_IN0_SEL      : mul_input0 = 'd0;
+                                     // Pad MSBs with 0s
+            `MID0_NODE_MUL_IN0_SEL : mul_input0 = {{PARAM_PROD_VAL_WIDTH-PARAM_ACCUM_VAL_WIDTH{1'b0}}, mid0_node_accum};
+            `PROD_MUL_IN0_SEL      : mul_input0 = prod_reg;
+            default                : mul_input0 = 'd0;
+        endcase
+    end
+
+    always@(*) begin
+        case (mul_input1_sel)
+            `ZERO_MUL_IN1_SEL      : mul_input1 = 'd0;
+            `MID1_NODE_MUL_IN1_SEL : mul_input1 = mid1_node_accum;
+            `END_NODE_MUL_IN1_SEL  : mul_input1 = end_node_accum;
+            default                : mul_input1 = 'd0;
+        endcase
+    end
+
+    assign prod_result = (mul_input0 * mul_input1);
+
+    always@(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            prod_reg <= 'd0;
+        end else if (wr_prod) begin
+            prod_reg <= prod_result;
         end
     end
 
@@ -242,8 +303,8 @@ module digital_top
     end
     
     // Control FSM
-    reg [2:0] curr_state;
-    reg [2:0] next_state;
+    reg [3:0] curr_state;
+    reg [3:0] next_state;
 
     reg [1:0] curr_part2_iter;
     reg [1:0] next_part2_iter;
@@ -313,9 +374,13 @@ module digital_top
         wr_mid0_node  = 1'b0;
         wr_mid1_node  = 1'b0;
         wr_end_node   = 1'b0;
+        wr_prod       = 1'b0;
 
         accum_input0_sel = `ZERO_IN0_SEL;
         accum_input1_sel = `ZERO_IN1_SEL;
+
+        mul_input0_sel = `ZERO_MUL_IN0_SEL;
+        mul_input1_sel = `ZERO_MUL_IN1_SEL;
 
         enable_check = 1'b0;
 
@@ -451,7 +516,6 @@ module digital_top
                 end
             end
             `END_BFS_ITER : begin
-                // TODO
                 if (part2_iter_mid0_selected) begin
                     // Push mid0 node to the FIFO queue
                     //   as the start node
@@ -486,10 +550,31 @@ module digital_top
                     next_part2_iter = `PART2_ITER_END;
 
                     next_state = `POP_CURR_NODE;
+                end else if (part2_iter_end_selected) begin
+                    // Write to product register which is also where the part 2
+                    //   answer is
+                    wr_prod = 1'b1;
 
+                    // Use mid0 and mid1 nodes as inputs to multiplier
+                    mul_input0_sel = `MID0_NODE_MUL_IN0_SEL;
+                    mul_input1_sel = `MID1_NODE_MUL_IN1_SEL;
+
+                    next_state = `END_MUL;
                 end else begin
+                    // Go to idle state after part 1
                     next_state = `IDLE;
                 end
+            end
+            `END_MUL : begin
+                // Write to product register again
+                wr_prod = 1'b1;
+
+                // Use the previous product register's value and
+                //   the accumulated end node value as inputs to the multiplier
+                mul_input0_sel = `PROD_MUL_IN0_SEL;
+                mul_input1_sel = `END_NODE_MUL_IN1_SEL;
+
+                next_state = `IDLE;
             end
             default           : begin
                 // Added for lint
