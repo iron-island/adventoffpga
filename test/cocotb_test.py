@@ -134,7 +134,7 @@ async def part1_part2_test(dut):
         node_idx_dict[node] = idx
         idx_node_dict[idx] = node
 
-    cocotb.start_soon(generate_clock(dut, 10000))
+    cocotb.start_soon(generate_clock(dut, 20000))
 
     for part_sel in [0, 1]:
         cocotb.start_soon(generate_reset(dut))
