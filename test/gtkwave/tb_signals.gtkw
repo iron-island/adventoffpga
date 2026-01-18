@@ -1,27 +1,48 @@
 [*]
 [*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
-[*] Sun Jan 18 11:18:37 2026
+[*] Sun Jan 18 17:36:20 2026
 [*]
 [dumpfile] "/home/aison/Projects/adventoffpga/test/tb.vcd"
-[dumpfile_mtime] "Sun Jan 18 11:16:05 2026"
+[dumpfile_mtime] "Sun Jan 18 17:33:36 2026"
 [dumpfile_size] 3338627
-[savefile] "/home/aison/Projects/adventoffpga/test/tb_signals.gtkw"
-[timestart] 124479850
+[savefile] "/home/aison/Projects/adventoffpga/test/gtkwave/tb_signals.gtkw"
+[timestart] 3315800
 [size] 1850 1006
-[pos] -1 -1
-*-14.211681 124601300 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[pos] -101 -101
+*-15.185208 3405000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb.
 [treeopen] tb.dut.
 [sst_width] 297
 [signals_width] 242
 [sst_expanded] 1
 [sst_vpaned_height] 625
+@200
+-Inputs
 @24
 tb.dut.clk
 tb.dut.rst_n
+@28
+tb.dut.start_run
+tb.dut.part_sel
+@24
+tb.dut.next_node_idx[9:0]
+@28
+tb.dut.rd_next_node_reg
+@200
+-Outputs
+@24
+tb.dut.node_idx_reg[9:0]
+@22
+tb.dut.next_node_counter[4:0]
+@24
 tb.dut.part_ans[48:0]
-@29
+@28
 tb.dut.done_reg
+@200
+-Testbench variables
+@820
+tb.curr_node_string[24:1]
+tb.next_node_string[24:1]
 @200
 -FSM
 @28
@@ -34,23 +55,12 @@ tb.dut.fifo_wr_data_sel[1:0]
 tb.dut.done
 @200
 -I/O
-@24
-tb.dut.node_idx_reg[9:0]
-tb.dut.next_node_idx[9:0]
-@22
-tb.dut.next_node_counter[4:0]
-@820
-tb.curr_node_string[24:1]
-tb.next_node_string[24:1]
-@28
-tb.dut.rd_next_node_reg
-tb.dut.start_run
-tb.dut.part_sel
-@200
 -FIFO
 @24
 tb.dut.fifo_wr_en
+@25
 tb.dut.fifo_rd_en
+@24
 tb.dut.fifo_wr_ptr[6:0]
 tb.dut.fifo_rd_ptr[6:0]
 @28
