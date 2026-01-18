@@ -423,7 +423,7 @@ module digital_top
 
                 // If on the last next_node_idx, go back to popping the queue,
                 //   otherwise there are more next_node_idx so keep pushing
-                end if (next_node_counter == 'd1) begin
+                end else if (next_node_counter == 'd1) begin
                     // Prepare to register node_idx_reg for fetching
                     //   during POP_CURR_NODE state
                     node_idx = fifo_node_idx[fifo_rd_ptr];
