@@ -25,7 +25,7 @@ The Verilog RTL top module is found in `src/digital_top.v`.
 # Design
 
 ## Advent of Code 2025 Day 11
-The inputs for this puzzle can be represented as a directed acyclic graph (DAG), with the devices themselves representing the nodes. So both parts can be solved with either a depth-first search (DFS) or a breadth-first search (BFS). Here, the testbench uses DFS as the reference answer implemented in software (`Python`), while the design implements BFS in hardware (`Verilog`). We'll first discuss the BFS-based solution as that is what is implemented in hardware.
+The inputs for this puzzle can be represented as a directed acyclic graph (DAG), with the devices themselves representing the nodes. I initially solved both parts using DFS with memoization, and then tried solving both parts again based on BFS which maps more easily to hardware as explained in the next section. Here, the testbench uses the DFS solution as the reference answer implemented in software (`Python`), while the design implements BFS in hardware (`Verilog`).
 
 A BFS-based solution is based on the idea that if we start from some initial start node that stores a value `1`, if we propagate that value to the whole graph by accumulating all values that a node gets from all its inputs, at the end node we would eventually get a value that corresponds to the number of paths.
 
@@ -61,3 +61,37 @@ This procedure can be used for both parts 1 and 2. For part 1, the value of the 
 
 If we use the procedure above for each of the 3 paths to get some value `svr_fft`, `fft_dac`, and `dac_out` and then multiply their results, we should get the part 2 answer.
 *This assumes `fft` comes first before `dac`, which seems to be the case for the inputs to this puzzle based on my own input after solving it and on `r/adventofcode` discussions. The Verilog implementation assumes the same. The general solution I did was to compute for `(svr_fft*fft_dac*dac_out) + (svr_dac*dac_fft*fft_out)` where `svr_fft` ignores values for `dac` and `svr_dac` ignores values for `fft`.
+
+This procedure is effectively a BFS where we have a FIFO queue that tracks both the node and its value. The next section explains how this is implemented and optimized in hardware.
+
+## BFS in Hardware
+
+The design has 5 main functional blocks:
+1. First-in, First-out (FIFO) queue
+2. Node index searcher
+3. Control FSM
+4. Adder
+5. Multiplier
+
+### FIFO
+
+The first main block of the design is the FIFO queue, implemented as a classical circular buffer. The FIFO depth chosen was 128, which is a power of 2 for simpler read/write pointer logic and seemed enough for my input after logging the maximum queue length with a BFS solution in `Python` after some optimizations, explained later. Each entry of the FIFO has the following registers (note that FIFO depth and bitwidths are parametrized, but showing their default values for simplicity):
+1. `fifo_node_idx[9:0]`   - the node represented as a numerical 10-bit node index
+2. `fifo_accum_val[23:0]` - the node's accumulated value representing the number of paths found up to the node so far
+3. `fifo_valid`           - a valid bit flag, which gets set/cleared when a node is pushed/popped from the FIFO
+
+### Node index searcher
+
+The second main block of the design is the node index searcher, which searches the whole FIFO for the presence of a given node index in a single cycle. This block is not functionally necessary but is an optimization that saves cycles of repeated pushing/popping to the FIFO. The searcher provides 2 outputs:
+1. `next_node_idx_present`   - a bit flag to represent whether the input node index is already present in the FIFO
+2. `fifo_direct_wr_ptr[6:0]` - a pointer to where the node index is present
+
+When an input node index is received, if that node index is already present on the FIFO based on `next_node_idx_present = 1`, then the node index is not pushed to the FIFO, but instead the `fifo_accum_val[23:0]` pointed to by `fifo_direct_wr_ptr[6:0]` is instead updated. This avoids unnecessary pushing to the FIFO of node indices already in the queue, which would eventually gets popped later on, which would then have their output nodes pushed, and so on and so forth.
+
+### Control FSM
+
+### Adder
+
+The fourth of the design is a single, combinational, 2 input, 24-bit adder that computes the accumulated value. Since only a single sum is computed at a time, only a single adder is needed. This also avoids implementing each `fifo_accum_val[23:0]` as an accumulator register which may synthesize to multiple adders. Then the adder instead has 2 inputs `accum_input0[23:0]` and `accum_input1[23:0]` whose values are multiplexed by the control FSM from input sources. The adder's combinational output `accum_result[23:0]` is also multiplexed by the control FSM to be saved to various registers, primarily to the `fifo_accum_val[23:0]` where the write pointer points to.
+
+### Multiplier
