@@ -152,3 +152,41 @@ The fifth block is a single cycle, combinational, 2 input 49-bit multiplier that
 2. `mul_input1[23:0]` - this is only 24 bits since its largest possible input comes from the 24-bit accumulated values
 
 The output `prod_result[48:0]` is always saved to the product register `prod_reg[48:0]`. There is no overflow detection done, since the product bit widths were only computed based on the part 2 answer using my input. Since the product bitwidth is is also parametrized, it can be increased if the expected part 2 answer does not fit.
+
+## Inputs and Outputs
+
+The following table shows the input and output ports of the design:
+
+| Port                     | Direction | Description                                                                                                                                          |
+| ------------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `clk`                    | input     | Free-running clock                                                                                                                                   |
+| `rst_n`                  | input     | Active-low reset, deassertion is synchronized to `posedge clk`                                                                                       |
+| `start_run`              | input     | Active-high input to start a run, must remain high after asserting                                                                                   |
+| `part_sel`               | input     | Selects whether part 1 (`part_sel = 0`) or part 2 (`part_sel = 1`) is being solved, must remain high after asserting                                 |
+| `next_node_idx[9:0]`     | input     | Node index of output node of `node_idx_reg[9:0]`                                                                                                     |
+| `next_node_counter[4:0]` | input     | Output node counter of `node_idx_reg[9:0]`                                                                                                           |
+| `node_idx_reg[9:0]`      | output    | Node index of current node to be popped from the FIFO queue                                                                                          |
+| `rd_next_node_reg`       | output    | Control signal to start reading output node indices from `next_node_idx[9:0]`                                                                        |
+| `part_ans[48:0]`         | output    | Answer from part 1 or part 2, valid only when `done_reg` is asserted                                                                                 |
+| `done_reg`               | output    | Active-high output to flag that solving is done                                                                                                      |
+
+
+A sample `gtkwave` snapshot of the initial cycles of a part 1 run is shown below:
+![alt text](https://github.com/iron-island/adventoffpga/blob/main/doc/img/part1_snapshot.png "Part 1 snapshot")
+
+The input/output sequence is as follows:
+1. Drive a free-running input clock `clk`
+2. Assert reset `rst_n`, and deassert after an arbitrary number of cycles. The design assumes that `rst_n` deassertion is already synchronized to `posedge clk`.
+3. Drive `part_sel` to choose which part to solve, and asserts `start_run`
+4. Input specific node indices to `next_node_idx[9:0]` based on which part to solve (`next_node_counter[4:0]` does not matter):
+   - Part 1: The start node, then the end node on the next cycle
+     - In the sample snapshot, a `'d191` and `'d571` is inputted starting on the 5th `negedge clk`, which are the indices for the start and end nodes `you` and `out`, respectively, as seen in the testbench string variable `curr_node_string[24:1]`. The testbench drives all signals on the `negedge clk` for simplicity, but can be driven on the preceding `posedge clk` as well. All registers in the design are `posedge clk` triggered. 
+   - Part 2: The start node, the "mid0" node, the "mid1" node, then the end node, on consecutive cycles
+5. On the next `posedge clk`, the design would assert `rd_next_reg` and drive the current node index `node_idx_reg[9:0]` to be popped from the FIFO, indicating that it expects to start reading its output nodes after 2 cycles.
+   - In the sample snapshot, `node_idx_reg[9:0] = 'd191`, which is the `you` node, since it is the first node in the FIFO. We also see that on the `negedge clk`, there is no change yet on `next_node_counter[4:0]` since there is no valid value yet
+6. On the next `posedge clk`, there is no change yet since this represents delays in the design driver to fetch the output nodes. This delay was arbitrarily chosen, since there's no handshake or backpressure.
+7. On the next `posedge clk`, the first output node on `next_node_idx[9:0]` and `next_node_counter[4:0]` is received by the design. The `next_node_counter[4:0]` starts with the number of target nodes of `node_idx_reg[9:0]`, and decrements until `1` when the last output node on `next_node_idx[9:0]` is received.
+   - In the sample snapshot, `next_node_idx[9:0] = 'd325` (node `hzn`) is sampled, then the node indices of `izj`, `oil`, ..., `csd` are received on consecutive cycles.
+8. When `next_node_counter[4:0] = 1`, the design drives a new node index on `node_idx_reg[9:0]` and the sequence repeates from step 6.
+   - In the sample snapshot, `node_idx_reg[9:0] = 'd325` (node `hzn`) on the marker since that was the first node pushed to the FIFO queue, and so its the next node popped.
+9. Once the `done_reg` is asserted, the answer is present on `part_ans[48:0]`, as shown in another snapshot with the same run below:
