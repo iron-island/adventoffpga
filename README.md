@@ -189,4 +189,7 @@ The input/output sequence is as follows:
    - In the sample snapshot, `next_node_idx[9:0] = 'd325` (node `hzn`) is sampled, then the node indices of `izj`, `oil`, ..., `csd` are received on consecutive cycles.
 8. When `next_node_counter[4:0] = 1`, the design drives a new node index on `node_idx_reg[9:0]` and the sequence repeates from step 6.
    - In the sample snapshot, `node_idx_reg[9:0] = 'd325` (node `hzn`) on the marker since that was the first node pushed to the FIFO queue, and so its the next node popped.
-9. Once the `done_reg` is asserted, the answer is present on `part_ans[48:0]`, as shown in another snapshot with the same run below:
+9. Once the `done_reg` is asserted, the answer is present on `part_ans[48:0]`
+   - In another sample snapshot below using the same part 1 run, a series of writes to the accumulated value of the end node is being done which is visible on `part_ans[48:0]`, and one `done_reg` is asserted, the output answer is valid and no longer updates
+
+![alt text](https://github.com/iron-island/adventoffpga/blob/main/doc/img/part1_snapshot_done.png "Part 1 snapshot answer done")
