@@ -1,0 +1,95 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Sun Jan 18 11:18:37 2026
+[*]
+[dumpfile] "/home/aison/Projects/adventoffpga/test/tb.vcd"
+[dumpfile_mtime] "Sun Jan 18 11:16:05 2026"
+[dumpfile_size] 3338627
+[savefile] "/home/aison/Projects/adventoffpga/test/tb_signals.gtkw"
+[timestart] 124479850
+[size] 1850 1006
+[pos] -1 -1
+*-14.211681 124601300 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb.
+[treeopen] tb.dut.
+[sst_width] 297
+[signals_width] 242
+[sst_expanded] 1
+[sst_vpaned_height] 625
+@24
+tb.dut.clk
+tb.dut.rst_n
+tb.dut.part_ans[48:0]
+@29
+tb.dut.done_reg
+@200
+-FSM
+@28
+tb.dut.curr_part2_iter[1:0]
+tb.dut.next_part2_iter[1:0]
+@24
+tb.dut.node_idx[9:0]
+@28
+tb.dut.fifo_wr_data_sel[1:0]
+tb.dut.done
+@200
+-I/O
+@24
+tb.dut.node_idx_reg[9:0]
+tb.dut.next_node_idx[9:0]
+@22
+tb.dut.next_node_counter[4:0]
+@820
+tb.curr_node_string[24:1]
+tb.next_node_string[24:1]
+@28
+tb.dut.rd_next_node_reg
+tb.dut.start_run
+tb.dut.part_sel
+@200
+-FIFO
+@24
+tb.dut.fifo_wr_en
+tb.dut.fifo_rd_en
+tb.dut.fifo_wr_ptr[6:0]
+tb.dut.fifo_rd_ptr[6:0]
+@28
+tb.dut.fifo_empty
+tb.dut.fifo_full
+@200
+-Start node
+@28
+tb.dut.wr_start_node
+@24
+tb.dut.start_node_idx[9:0]
+@200
+-Middle nodes
+@24
+tb.dut.mid0_node_idx[9:0]
+tb.dut.mid0_node_accum[23:0]
+tb.dut.mid1_node_idx[9:0]
+tb.dut.mid1_node_accum[23:0]
+@200
+-End node
+@28
+tb.dut.wr_end_node
+@24
+tb.dut.end_node_idx[9:0]
+tb.dut.end_node_accum[23:0]
+@200
+-Accumulator
+@28
+tb.dut.accum_input1_sel[1:0]
+@22
+tb.dut.accum_input0[23:0]
+tb.dut.accum_input1[23:0]
+tb.dut.accum_result[23:0]
+@200
+-Node index exists
+@28
+tb.dut.enable_check
+tb.dut.next_node_idx_present
+tb.dut.fifo_direct_wr_en
+tb.dut.next_node_idx_present
+[pattern_trace] 1
+[pattern_trace] 0
