@@ -36,9 +36,8 @@ module tb ();
     reg [PARAM_NODE_IDX_WIDTH-1:0] next_node_idx;
     reg [PARAM_COUNTER_WIDTH-1:0]  next_node_counter;
 
-    reg [PARAM_ACCUM_VAL_WIDTH-1:0] part1_ans;
-    reg [PARAM_PROD_VAL_WIDTH-1:0]  part2_ans;
-    reg                             done_reg;
+    reg [PARAM_PROD_VAL_WIDTH-1:0] part_ans;
+    reg                            done_reg;
 
     // Testbench variables for logging nodes as 3-character strings
     reg [3*8:1] curr_node_string;
@@ -57,8 +56,7 @@ module tb ();
         .next_node_idx(next_node_idx),
         .next_node_counter(next_node_counter),
 
-        .part1_ans(part1_ans),
-        .part2_ans(part2_ans),
+        .part_ans(part_ans),
         .done_reg(done_reg)
     );
 

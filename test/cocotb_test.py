@@ -238,7 +238,7 @@ async def part1_part2_test(dut):
         # Check answer using software solution to part 1
         if (part_sel == 0):
             part1_ans_exp = dfs_part1(start_node)
-            dut_part1_ans = dut.part1_ans.value
+            dut_part1_ans = dut.part_ans.value
             cocotb.log.info(f'Part 1 expected answer from software: {part1_ans_exp}')
             cocotb.log.info(f'Part 1 computed answer from hardware: {int(dut_part1_ans)}')
             assert(dut_part1_ans == part1_ans_exp)
