@@ -56,7 +56,7 @@ Using the puzzle's part 1 example:
    - `ccc = 1`
 3. Now, we propagate the values of `bbb` and `ccc` to their respective outputs. However, since they share the output nodes `ddd` and `eee`, we accumulate both values there so that:
    - `ddd = 2` from both `bbb = 1` and `ccc = 1`
-   - `eee = 2` from both `bbb = 1` and `ccc = `
+   - `eee = 2` from both `bbb = 1` and `ccc = 1`
    - `fff = 1` from `ccc = 1`
 4. We repeat this process of propagating values until we arrive at the end node `out`, where we should eventually get `out = 5`.
 
