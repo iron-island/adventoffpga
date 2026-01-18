@@ -69,7 +69,7 @@ This procedure is effectively a BFS where we have a FIFO queue that tracks both 
 The design has 5 main functional blocks:
 1. First-in, First-out (FIFO) queue
 2. Node index searcher
-3. Control FSM
+3. Control finite state machine (FSM)
 4. Adder
 5. Multiplier
 
@@ -82,13 +82,52 @@ The first main block of the design is the FIFO queue, implemented as a classical
 
 ### Node index searcher
 
-The second main block of the design is the node index searcher, which searches the whole FIFO for the presence of a given node index in a single cycle. This block is not functionally necessary but is an optimization that saves cycles of repeated pushing/popping to the FIFO. The searcher provides 2 outputs:
+The second main block of the design is the node index searcher, which searches the whole FIFO for the presence of a given node index in a single cycle. This block is not necessary from a functional sense, but is a necessary optimization to make the hardware design more realistic/practical. The searcher provides 2 outputs:
 1. `next_node_idx_present`   - a bit flag to represent whether the input node index is already present in the FIFO
 2. `fifo_direct_wr_ptr[6:0]` - a pointer to where the node index is present
 
-When an input node index is received, if that node index is already present on the FIFO based on `next_node_idx_present = 1`, then the node index is not pushed to the FIFO, but instead the `fifo_accum_val[23:0]` pointed to by `fifo_direct_wr_ptr[6:0]` is instead updated. This avoids unnecessary pushing to the FIFO of node indices already in the queue, which would eventually gets popped later on, which would then have their output nodes pushed, and so on and so forth.
+When an input node index is received, if that node index is already present on the FIFO based on `next_node_idx_present = 1`, then the node index is not pushed to the FIFO, but instead the `fifo_accum_val[23:0]` pointed to by `fifo_direct_wr_ptr[6:0]` is instead updated, effectively making each node index's value accumulate in only one of its entries. This avoids unnecessary pushing to the FIFO of node indices already in the queue, which would eventually gets popped later on, which would then have their output nodes pushed, and so on and so forth. Consequently, this also reduces the necessary depth of the FIFO. For example, in my input:
+- The longest path was from `fft_dac = 8995504`, which required only a maximum FIFO depth of `107`. But without the searcher logic, the `Python` implementation shows that it still reaches millions (and possibly more) since it keeps pushing/popping nodes.
+- The shortest path was from part 1 for `you_out = 585`, which only needed a maximum FIFO depth of `27`. Without the searcher, it also needed a depth of `585` since each entry would just be individual `1`s that eventually accumulate to `out`.
+
+Unlike in software, the searcher in hardware checks is able to check all 128 entries of `fifo_node_idx[9:0]` and `fifo_valid` in parallel to efficiently search the whole FIFO in 1 clock cycle, with a trade off of needing more logic needed proportional to the FIFO depth.
 
 ### Control FSM
+
+The third main block is the control FSM, which is responsible for all the input controls and data flow of the whole design, and is effectively what implements the whole BFS algorithm. The FSM is composed of 9 states:
+1. `IDLE`
+   - idle state when the design is not doing anything, such as during reset or after solving is done
+2. `FETCH_START_NODE`
+   - fetches the start node index from the `next_node_idx[9:0]` input, pushes it to the FIFO, and saves it to `start_node_idx[9:0]` register
+   - in part 1, transitions to `FETCH_END_NODE`
+   - in part 2, transitions to `FETCH_MID0_NODE`
+3. `FETCH_MID0_NODE`
+   - unused and unreachable in part 1
+   - in part 2, fetches the first middle ("mid0") node index from the `next_node_idx[9:0]` input, saves it to `mid0_node_idx[9:0]` register, then transitions to `FETCH_MID1_NODE`
+4. `FETCH_MID1_NODE`
+   - in part 2, fetches the second middle ("mid1") node index from the `next_node_idx[9:0]` input, saves it to `mid1_node_idx[9:0]` register, then transitions to `FETCH_END_NODE`
+5. `FETCH_END_NODE`
+   - fetches the end node index from the `next_node_idx[9:0]` input and saves it to`end_node_idx[9:0]` register
+   - loads the `node_idx_reg[9:0]` output based on the `fifo_node_idx[9:0]` pointed to by `fifo_rd_ptr[6:0]` to fetch the target nodes, then transitions to `POP_CURR_NODE`
+6. `POP_CURR_NODE`
+   - if the FIFO is empty, transitions to `END_BFS_ITER`
+   - if the FIFO is not empty, pops a node from the FIFO (same as `node_idx_reg[9:0]`), based on the FIFO read pointer `fifo_rd_ptr[6:0]`, then transitions to `PUSH_NEXT_NODE`
+7. `PUSH_NEXT_NODE`
+   - if the FIFO is empty, transitions to `END_BFS_ITER`
+   - if the FIFO is not empty:
+     - if `next_node_idx[9:0]` is not in the FIFO based on the searcher logic, pushes it to the FIFO, based on the FIFO write pointer `fifo_wr_ptr[6:0]`
+     - if `next_node_idx[9:0]` is in the FIFO based on the searcher logic, update the accumulated value based on the FIFO direct write pointer `fifo_direct_wr_ptr[6:0]`
+     - transitions to `POP_CURR_NODE`
+8. `END_BFS_ITER`
+   - in part 1 this asserts the `done_reg` output flag and transitions to `IDLE`
+   - in part 2 this transitions back to `POP_CURR_NODE` to do BFS 2 more times to compute for the other 2 paths
+   - in part 2 on the last iteration, this starts the 1st multiplication between the start-to-mid0 (`svt_fft`) and mid0-to-mid1 (`fft_dac`) paths for saving to a product register `prod_reg[48:0]` and transitions to `END_MUL`
+9. `END_MUL`
+   - unused and unreachable in part 1
+   - in part 2, this starts the 2nd multiplication between `prod_reg[48:0]` and the mid1-to-end (`dac_out`) paths for saving to the final answer `part_ans[48:0]`
+   - in part 2, asserts the `done_reg` output flag and transitions to `IDLE`
+
+Once the puzzle is solved, the FSM transitions back to `IDLE`, where the output flag `done_reg = 1` to represent that it is done and that the part 1 or part 2 answer value is valid on the `part_ans[48:0]` output.
 
 ### Adder
 
