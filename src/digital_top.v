@@ -6,7 +6,7 @@
 `define FETCH_END_NODE   3'b100
 `define POP_CURR_NODE    3'b101
 `define PUSH_NEXT_NODE   3'b110
-`define OUTPUT_RESULT    3'b111
+`define END_BFS_ITER     3'b111
 
 // Part 1 or 2 selection
 `define PART1_SEL 1'b0
@@ -374,7 +374,7 @@ module digital_top
                 accum_input1_sel = `FIFO_RD_IN1_SEL;
 
                 if (fifo_empty) begin
-                    next_state = `OUTPUT_RESULT;
+                    next_state = `END_BFS_ITER;
 
                     // Assert done flag only after part 1, or after the last BFS iteration of part 2
                     done = (part1_selected | part2_iter_end_selected);
@@ -430,7 +430,7 @@ module digital_top
                 // If FIFO is already empty, and it wasn't due to popping the starting node,
                 //   output is done
                 if (fifo_empty & (node_idx_reg != start_node_used)) begin
-                    next_state = `OUTPUT_RESULT;
+                    next_state = `END_BFS_ITER;
 
                     // Assert done flag only after part 1, or after the last BFS iteration of part 2
                     done = (part1_selected | part2_iter_end_selected);
@@ -450,7 +450,7 @@ module digital_top
                     next_state = `PUSH_NEXT_NODE;
                 end
             end
-            `OUTPUT_RESULT : begin
+            `END_BFS_ITER : begin
                 // TODO
                 if (part2_iter_mid0_selected) begin
                     // Push mid0 node to the FIFO queue
