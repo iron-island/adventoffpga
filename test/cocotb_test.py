@@ -123,7 +123,7 @@ async def input_file_test(dut):
     #pprint.pp(graph_dict)
 
 @cocotb.test()
-async def part1_test(dut):
+async def part1_part2_test(dut):
     graph_dict = parse_input(INPUT_FILE)
 
     # Create index values for nodes
@@ -134,81 +134,114 @@ async def part1_test(dut):
         node_idx_dict[node] = idx
         idx_node_dict[idx] = node
 
-    cocotb.start_soon(generate_clock(dut, 2000))
-    cocotb.start_soon(generate_reset(dut))
+    cocotb.start_soon(generate_clock(dut, 10000))
 
-    # Wait for a few cycles before starting the run
-    await Timer(3*CLK_PERIOD_NS, unit="ns")
+    for part_sel in [0, 1]:
+        cocotb.start_soon(generate_reset(dut))
 
-    # Start the run synchronized to negedge
-    await FallingEdge(dut.clk)
-    dut.part_sel.value = 0
-    dut.start_run.value = 1
-    await RisingEdge(dut.clk)
+        # Wait for a few cycles before starting the run
+        await Timer(3*CLK_PERIOD_NS, unit="ns")
 
-    # TODO: Testbench has knowledge of the design to know when to drive the start and end node indices,
-    #         by reusing the next_node_idx input. Alternatively this can be replaced by dedicated
-    #         inputs to be more general, and would also simplify the design
-
-    # Input start node index
-    start_node = "you"
-    start_node_idx_exp = node_idx_dict[start_node]
-    end_node = "out"
-    end_node_idx_exp = node_idx_dict[end_node]
-
-    await FallingEdge(dut.clk)
-    dut.next_node_idx.value = start_node_idx_exp
-    update_tb_node_strings(dut, "", start_node)
-    await RisingEdge(dut.clk)
-
-    # Check that start node index was written to FIFO
-    await FallingEdge(dut.clk)
-    cocotb.log.info(f'Start node: {start_node}, index {start_node_idx_exp}')
-    assert(dut.dut.fifo_node_idx[0].value == start_node_idx_exp)
-
-    # Input end node index
-    dut.next_node_idx.value = end_node_idx_exp
-    update_tb_node_strings(dut, "", end_node)
-    await RisingEdge(dut.clk)
-
-    # Check that end node index was written to register
-    await FallingEdge(dut.clk)
-    cocotb.log.info(f'End node: {end_node}, index {end_node_idx_exp}')
-    assert(dut.dut.end_node_idx.value == end_node_idx_exp)
-
-    # Drive target nodes
-    #await FallingEdge(dut.clk)
-    while (dut.rd_next_node_reg.value) and (dut.done_reg.value == 0):
-        # Drive counter to 0 first, since data about the target nodes
-        #   including the count would only be available on succeeding
-        #   cycles. This testbench assumes only 1 cycle to read
-        #   from memory
-        node_idx = int(dut.node_idx_reg.value)
-        node = idx_node_dict[node_idx]
-        update_tb_node_strings(dut, node, "x")
+        # Start the run synchronized to negedge
         await FallingEdge(dut.clk)
-        
-        next_node_count = len(graph_dict[node])
-        for next_node in graph_dict[node]:
-            # Convert to node index
-            next_node_idx = node_idx_dict[next_node]
+        dut.part_sel.value = part_sel
+        dut.start_run.value = 1
+        await RisingEdge(dut.clk)
 
-            dut.next_node_idx.value = next_node_idx
-            dut.next_node_counter.value = next_node_count
+        # TODO: Testbench has knowledge of the design to know when to drive the start and end node indices,
+        #         by reusing the next_node_idx input. Alternatively this can be replaced by dedicated
+        #         inputs to be more general, and would also simplify the design
 
-            next_node_count -= 1
+        # Input start node index
+        if (part_sel == 0):
+            start_node = "you"
+        elif (part_sel == 1):
+            start_node = "svr"
+        end_node = "out"
+        start_node_idx_exp = node_idx_dict[start_node]
+        end_node_idx_exp = node_idx_dict[end_node]
 
-            # Update testbench variable for debugging and logging
-            update_tb_node_strings(dut, node, next_node)
+        await FallingEdge(dut.clk)
+        dut.next_node_idx.value = start_node_idx_exp
+        update_tb_node_strings(dut, "", start_node)
+        await RisingEdge(dut.clk)
 
+        # Check that start node index was written to FIFO
+        await FallingEdge(dut.clk)
+        cocotb.log.info(f'Start node: {start_node}, index {start_node_idx_exp}')
+        assert(dut.dut.fifo_node_idx[0].value == start_node_idx_exp)
+
+        # For part 2, also input middle nodes
+        if (part_sel == 1):
+            mid0_node = "fft"
+            mid1_node = "dac"
+            mid0_node_idx_exp = node_idx_dict[mid0_node]
+            mid1_node_idx_exp = node_idx_dict[mid1_node]
+
+            # Input mid0 node
+            dut.next_node_idx.value =  mid0_node_idx_exp
+            update_tb_node_strings(dut, "", mid0_node)
+            await RisingEdge(dut.clk)
+
+            # Check that mid0 node index was written to register
             await FallingEdge(dut.clk)
+            cocotb.log.info(f'Mid0 node: {mid0_node}, index {mid0_node_idx_exp}')
+            assert(dut.dut.mid0_node_idx.value == mid0_node_idx_exp)
 
-    # Check answer using software solution to part 1
-    part1_ans_exp = dfs_part1("you")
-    dut_part1_ans = dut.part1_ans.value
-    cocotb.log.info(f'Part 1 expected answer from software: {part1_ans_exp}')
-    cocotb.log.info(f'Part 1 computed answer from hardware: {int(dut_part1_ans)}')
-    assert(dut_part1_ans == part1_ans_exp)
+            # Input mid1 node
+            dut.next_node_idx.value =  mid1_node_idx_exp
+            update_tb_node_strings(dut, "", mid1_node)
+            await RisingEdge(dut.clk)
+
+            # Check that mid0 node index was written to register
+            await FallingEdge(dut.clk)
+            cocotb.log.info(f'Mid1 node: {mid1_node}, index {mid1_node_idx_exp}')
+            assert(dut.dut.mid1_node_idx.value == mid1_node_idx_exp)
+
+        # Input end node index
+        dut.next_node_idx.value = end_node_idx_exp
+        update_tb_node_strings(dut, "", end_node)
+        await RisingEdge(dut.clk)
+
+        # Check that end node index was written to register
+        await FallingEdge(dut.clk)
+        cocotb.log.info(f'End node: {end_node}, index {end_node_idx_exp}')
+        assert(dut.dut.end_node_idx.value == end_node_idx_exp)
+
+        # Drive target nodes
+        #await FallingEdge(dut.clk)
+        while (dut.rd_next_node_reg.value) and (dut.done_reg.value == 0):
+            # Drive counter to 0 first, since data about the target nodes
+            #   including the count would only be available on succeeding
+            #   cycles. This testbench assumes only 1 cycle to read
+            #   from memory
+            node_idx = int(dut.node_idx_reg.value)
+            node = idx_node_dict[node_idx]
+            update_tb_node_strings(dut, node, "x")
+            await FallingEdge(dut.clk)
+            
+            next_node_count = len(graph_dict[node])
+            for next_node in graph_dict[node]:
+                # Convert to node index
+                next_node_idx = node_idx_dict[next_node]
+
+                dut.next_node_idx.value = next_node_idx
+                dut.next_node_counter.value = next_node_count
+
+                next_node_count -= 1
+
+                # Update testbench variable for debugging and logging
+                update_tb_node_strings(dut, node, next_node)
+
+                await FallingEdge(dut.clk)
+
+        # Check answer using software solution to part 1
+        if (part_sel == 0):
+            part1_ans_exp = dfs_part1(start_node)
+            dut_part1_ans = dut.part1_ans.value
+            cocotb.log.info(f'Part 1 expected answer from software: {part1_ans_exp}')
+            cocotb.log.info(f'Part 1 computed answer from hardware: {int(dut_part1_ans)}')
+            assert(dut_part1_ans == part1_ans_exp)
 
     # Wait for a few clock cycles before simulation ends
     await Timer(10*CLK_PERIOD_NS, unit="ns")
