@@ -170,6 +170,7 @@ The following table shows the input and output ports of the design:
 | `part_ans[48:0]`         | output    | Answer from part 1 or part 2, valid only when `done_reg` is asserted                                                                                 |
 | `done_reg`               | output    | Active-high output to flag that solving is done                                                                                                      |
 
+The design does not have any knowledge of what the specific start, "mid0", "mid1", or end nodes are, nor does it have knowledge of the whole graph. Instead, the design receives what those start, "mid0", "mid1", and end nodes are, and fetches only what output nodes it needs based on its internal BFS algorithm.
 
 A sample `gtkwave` snapshot of the initial cycles of a part 1 run is shown below:
 ![alt text](https://github.com/iron-island/adventoffpga/blob/main/doc/img/part1_snapshot.png "Part 1 snapshot")
