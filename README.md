@@ -155,7 +155,7 @@ The output `prod_result[48:0]` is always saved to the product register `prod_reg
 
 ## Inputs and Outputs
 
-The following table shows the input and output ports of the design:
+The following table shows the input/output ports:
 
 | Port                     | Direction | Description                                                                                                                                          |
 | ------------------------ | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -163,12 +163,22 @@ The following table shows the input and output ports of the design:
 | `rst_n`                  | input     | Active-low reset, deassertion is synchronized to `posedge clk`                                                                                       |
 | `start_run`              | input     | Active-high input to start a run, must remain high after asserting                                                                                   |
 | `part_sel`               | input     | Selects whether part 1 (`part_sel = 0`) or part 2 (`part_sel = 1`) is being solved, must remain high after asserting                                 |
-| `next_node_idx[9:0]`     | input     | Node index of output node of `node_idx_reg[9:0]`                                                                                                     |
-| `next_node_counter[4:0]` | input     | Output node counter of `node_idx_reg[9:0]`                                                                                                           |
+| `next_node_idx[9:0]`     | input     | Node index of output node of `node_idx_reg[9:0]`. Parametrizable bitwidth using`PARAM_NODE_IDX_WIDTH`.                                               |
+| `next_node_counter[4:0]` | input     | Output node counter of `node_idx_reg[9:0]`. Parametrizable bitwidth using `PARAM_COUNTER_WIDTH`.                                                     |
 | `node_idx_reg[9:0]`      | output    | Node index of current node to be popped from the FIFO queue                                                                                          |
 | `rd_next_node_reg`       | output    | Control signal to start reading output node indices from `next_node_idx[9:0]`                                                                        |
-| `part_ans[48:0]`         | output    | Answer from part 1 or part 2, valid only when `done_reg` is asserted                                                                                 |
+| `part_ans[48:0]`         | output    | Answer from part 1 or part 2, valid only when `done_reg` is asserted. Parametrizable bitwidth using `PARAM_PROD_VAL_WIDTH`                           |
 | `done_reg`               | output    | Active-high output to flag that solving is done                                                                                                      |
+
+The following table shows the parameters of the design. The default values were chosen based on my puzzle input, but generally since puzzles have similar sizes, and that these generally scale with `log2()`, the following should be generally applicable to any AOC 2025 Day 11 input. Increasing them more than necessary would not affect the runtime and instead needlessly increase the logic area and power:
+
+| Parameter               | Default value | Description                                                                                                               |
+| ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `PARAM_NODE_IDX_WIDTH`  | 10            | Bitwidth for node indices, this scales with `log2()` of the total number of nodes                                         |
+| `PARAM_COUNTER_WIDTH`   | 5             | BItwidth for output node, this scales with `log2()` of the maximum possible number of output nodes of any given node      |
+| `PARAM_ACCUM_VAL_WIDTH` | 24            | Bitwidth for the accumulated values, this scales with `log2()` of the number of unique paths between (Part 1): the start node and the end node or (Part 2): either one of the 3 paths start-to-mid0, mid0-to-mid1, and mid1-to-end with the maximum number of paths. This does not need to scale with start-to-end or to any other pairs of paths since the solution already decomposes them to the 3 paths |
+| `PARAM_PROD_VAL_WIDTH`  | 49            | Bitwidth for the product register, this scales with `log2()` of the part 2 answer.                                        |
+| `PARAM_FIFO_DEPTH`      | 128           | FIFO queue depth, constrained to a power of 2 by design, this scales with the breadth of the graph                        |
 
 The design does not have any knowledge of what the specific start, "mid0", "mid1", or end nodes are, nor does it have knowledge of the whole graph. Instead, the design receives what those start, "mid0", "mid1", and end nodes are, and fetches only what output nodes it needs based on its internal BFS algorithm.
 
