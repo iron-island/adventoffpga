@@ -258,12 +258,25 @@ module digital_top
     reg part2_iter_mid1_selected;
     reg part2_iter_end_selected;
 
+    reg [PARAM_NODE_IDX_WIDTH-1:0]  start_node_used;
+
     assign part1_selected = (part_sel == `PART1_SEL);
     assign part2_selected = !part1_selected;
 
     assign part2_iter_mid0_selected = (part2_selected & (curr_part2_iter == `PART2_ITER_MID0));
     assign part2_iter_mid1_selected = (part2_selected & (curr_part2_iter == `PART2_ITER_MID1));
     assign part2_iter_end_selected  = (part2_selected & (curr_part2_iter == `PART2_ITER_END));
+
+    always@(*) begin
+        if (part2_iter_mid1_selected) begin
+            start_node_used = mid0_node_idx;
+        end else if (part2_iter_end_selected) begin
+            start_node_used = mid1_node_idx;
+        end else begin
+            // Covers part 1 and 1st iteration of part 2
+            start_node_used = start_node_idx;
+        end
+    end
 
     always@(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -363,8 +376,6 @@ module digital_top
                 if (fifo_empty) begin
                     next_state = `OUTPUT_RESULT;
 
-                    rd_next_node = 1'b0;
-
                     // Assert done flag only after part 1, or after the last BFS iteration of part 2
                     done = (part1_selected | part2_iter_end_selected);
 
@@ -418,13 +429,14 @@ module digital_top
 
                 // If FIFO is already empty, and it wasn't due to popping the starting node,
                 //   output is done
-                if (fifo_empty & (node_idx_reg != start_node_idx)) begin
+                if (fifo_empty & (node_idx_reg != start_node_used)) begin
                     next_state = `OUTPUT_RESULT;
-
-                    rd_next_node = 1'b0;
 
                     // Assert done flag only after part 1, or after the last BFS iteration of part 2
                     done = (part1_selected | part2_iter_end_selected);
+
+                    // Do not push the next node anymore
+                    fifo_wr_en = 1'b0;
 
                 // If on the last next_node_idx, go back to popping the queue,
                 //   otherwise there are more next_node_idx so keep pushing
@@ -453,8 +465,6 @@ module digital_top
                     // Prepare to register node_idx_reg for fetching
                     //   during POP_CURR_NODE state
                     node_idx = mid0_node_idx;
-                    rd_next_node = 1'b1;
-
                     // Update part 2 iteration
                     next_part2_iter = `PART2_ITER_MID1;
 
@@ -472,8 +482,6 @@ module digital_top
                     // Prepare to register node_idx_reg for fetching
                     //   during POP_CURR_NODE state
                     node_idx = mid1_node_idx;
-                    rd_next_node = 1'b1;
-
                     // Update part 2 iteration
                     next_part2_iter = `PART2_ITER_END;
 
