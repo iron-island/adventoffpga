@@ -441,8 +441,11 @@ module digital_top
                 if (fifo_empty) begin
                     next_state = `END_BFS_ITER;
 
-                    // Assert done flag only after part 1, or after the last BFS iteration of part 2
-                    done = (part1_selected | part2_iter_end_selected);
+                    // Assert done flag only after part 1
+                    done = part1_selected;
+
+                    // Deassert read control only after part 1 or after last iteration of part 2
+                    rd_next_node = !(part1_selected | part2_iter_end_selected);
 
                 end else begin
                     next_state = `PUSH_NEXT_NODE;
@@ -497,8 +500,11 @@ module digital_top
                 if (fifo_empty & (node_idx_reg != start_node_used)) begin
                     next_state = `END_BFS_ITER;
 
-                    // Assert done flag only after part 1, or after the last BFS iteration of part 2
-                    done = (part1_selected | part2_iter_end_selected);
+                    // Assert done flag only after part 1
+                    done = part1_selected;
+
+                    // Deassert read control only after part 1 or after last iteration of part 2
+                    rd_next_node = !(part1_selected | part2_iter_end_selected);
 
                     // Do not push the next node anymore
                     fifo_wr_en = 1'b0;
@@ -573,6 +579,9 @@ module digital_top
                 //   the accumulated end node value as inputs to the multiplier
                 mul_input0_sel = `PROD_MUL_IN0_SEL;
                 mul_input1_sel = `END_NODE_MUL_IN1_SEL;
+
+                // Assert done flag, since this is the end of part 2
+                done = 1'b1;
 
                 next_state = `IDLE;
             end
