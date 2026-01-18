@@ -35,6 +35,10 @@
 `define FIFO_RD_IN1_SEL      2'b10
 `define FIFO_PREV_RD_IN1_SEL 2'b11
 
+// For selecting input data to FIFO when writing
+`define FIFO_PUSH_MID0 2'b01
+`define FIFO_PUSH_MID1 2'b10
+
 module digital_top
 #(
     parameter PARAM_NODE_IDX_WIDTH  = 10,
@@ -156,6 +160,8 @@ module digital_top
     reg                                fifo_rd_en;
     reg                                fifo_direct_wr_en;
 
+    reg [1:0]                          fifo_wr_data_sel;
+
     reg                                fifo_wr_rd_ptr_eq;
     reg                                fifo_empty;
     reg                                fifo_full;
@@ -183,7 +189,13 @@ module digital_top
             case (1'b1)
                 fifo_wr_en   : begin
                     fifo_accum_val[fifo_wr_ptr] <= accum_result;
-                    fifo_node_idx[fifo_wr_ptr]  <= next_node_idx;
+                    if (fifo_wr_data_sel == `FIFO_PUSH_MID0) begin
+                        fifo_node_idx[fifo_wr_ptr] <= mid0_node_idx;
+                    end else if (fifo_wr_data_sel == `FIFO_PUSH_MID1) begin
+                        fifo_node_idx[fifo_wr_ptr] <= mid1_node_idx;
+                    end else begin
+                        fifo_node_idx[fifo_wr_ptr] <= next_node_idx;
+                    end
                     fifo_valid[fifo_wr_ptr]     <= 1'b1;
 
                     fifo_wr_ptr <= fifo_wr_ptr + 1'b1;
@@ -282,6 +294,8 @@ module digital_top
 
         fifo_direct_wr_en = 1'b0;
 
+        fifo_wr_data_sel = 2'b00;
+
         wr_start_node = 1'b0;
         wr_mid0_node  = 1'b0;
         wr_mid1_node  = 1'b0;
@@ -350,6 +364,7 @@ module digital_top
                     next_state = `OUTPUT_RESULT;
 
                     done = 1'b1;
+                    rd_next_node = 1'b0;
                 end else begin
                     next_state = `PUSH_NEXT_NODE;
                 end
@@ -404,6 +419,7 @@ module digital_top
                     next_state = `OUTPUT_RESULT;
 
                     done = 1'b1;
+                    rd_next_node = 1'b0;
 
                 // If on the last next_node_idx, go back to popping the queue,
                 //   otherwise there are more next_node_idx so keep pushing
@@ -418,7 +434,43 @@ module digital_top
                 end
             end
             `OUTPUT_RESULT : begin
-                next_state = `IDLE;
+                // TODO
+                if (part2_iter_mid1_selected) begin
+                    // Push mid0 node to the FIFO queue
+                    //   as the start node
+                    fifo_wr_en = 1'b1;
+                    fifo_wr_data_sel = `FIFO_PUSH_MID0;
+
+                    // Initialize pushed node with 1
+                    accum_input0_sel = `ZERO_IN0_SEL;
+                    accum_input1_sel = `ONE_IN1_SEL;
+
+                    // Prepare to register node_idx_reg for fetching
+                    //   during POP_CURR_NODE state
+                    node_idx = mid0_node_idx;
+                    rd_next_node = 1'b1;
+
+                    next_state = `POP_CURR_NODE;
+                end else if (part2_iter_end_selected) begin
+                    // Push mid1 node to the FIFO queue
+                    //   as the start node
+                    fifo_wr_en = 1'b1;
+                    fifo_wr_data_sel = `FIFO_PUSH_MID1;
+
+                    // Initialize pushed node with 1
+                    accum_input0_sel = `ZERO_IN0_SEL;
+                    accum_input1_sel = `ONE_IN1_SEL;
+
+                    // Prepare to register node_idx_reg for fetching
+                    //   during POP_CURR_NODE state
+                    node_idx = mid1_node_idx;
+                    rd_next_node = 1'b1;
+
+                    next_state = `POP_CURR_NODE;
+
+                end else begin
+                    next_state = `IDLE;
+                end
             end
             default           : begin
                 // Added for lint
