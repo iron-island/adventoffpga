@@ -81,7 +81,7 @@ The design has 5 main functional blocks:
 
 ### FIFO
 
-The first main block of the design is the FIFO queue, implemented as a classical circular buffer. The FIFO depth chosen was 128, which is a power of 2 for simpler read/write pointer logic and seemed enough for my input after logging the maximum queue length with a BFS solution in `Python` after some optimizations, explained later. Each entry of the FIFO has the following registers (note that FIFO depth and bitwidths are parametrized, but showing their default values for simplicity):
+The first main block of the design is the FIFO queue, implemented as a classical circular buffer. The FIFO depth chosen was 128, which is a power of 2 for simpler read/write pointer logic and seemed enough for my input after logging the maximum queue length with a BFS solution in `Python` after some optimizations using the searcher, explained later. Each entry of the FIFO has the following registers (note that FIFO depth and bitwidths are parametrized, but showing their default values for simplicity):
 1. `fifo_node_idx[9:0]`   - the node represented as a numerical 10-bit node index
 2. `fifo_accum_val[23:0]` - the node's accumulated value representing the number of paths found up to the node so far
 3. `fifo_valid`           - a valid bit flag, which gets set/cleared when a node is pushed/popped from the FIFO
@@ -121,6 +121,7 @@ The third main block is the control FSM, which is responsible for all the input 
 7. `PUSH_NEXT_NODE`
    - if the FIFO is empty, transitions to `END_BFS_ITER`
    - if the FIFO is not empty:
+     - if `next_node_idx[9:0]` is the end node (depending on part and iteration), it is not pushed to the FIFO but instead the end node's accumulated value is updated
      - if `next_node_idx[9:0]` is not in the FIFO based on the searcher logic, pushes it to the FIFO, based on the FIFO write pointer `fifo_wr_ptr[6:0]`
      - if `next_node_idx[9:0]` is in the FIFO based on the searcher logic, update the accumulated value based on the FIFO direct write pointer `fifo_direct_wr_ptr[6:0]`
      - transitions to `POP_CURR_NODE`
@@ -132,6 +133,11 @@ The third main block is the control FSM, which is responsible for all the input 
    - unused and unreachable in part 1
    - in part 2, this starts the 2nd multiplication between `prod_reg[48:0]` and the mid1-to-end (`dac_out`) paths for saving to the final answer `part_ans[48:0]`
    - in part 2, asserts the `done_reg` output flag and transitions to `IDLE`
+
+During the BFS, the starting node is always pushed to the FIFO at the start when the FIFO is still empty, and all target nodes are pushed to the FIFO. The only exception is the end node which is never pushed to the FIFO since we aren't interested in their output nodes, and since the possible end nodes all have dedicated registers separate from the FIFO for accumulating its value so that they get directly used by the adder or multiplier:
+1. `mid0_node_accum[23:0]` - accumulated value for the "mid0" node `mid0_node_idx[3:0]` (e.g. `fft`)
+2. `mid1_node_accum[23:0]` - accumulated value for the "mid1" node `mid1_node_idx[3:0]` (e.g. `dac`)
+3. `end_node_accum[23:0]`  - accumulated value for the end node `end_node_idx[3:0]` (e.g. `out`)
 
 Once the puzzle is solved, the FSM transitions back to `IDLE`, where the output flag `done_reg = 1` to represent that it is done and that the part 1 or part 2 answer value is valid on the `part_ans[48:0]` output.
 
