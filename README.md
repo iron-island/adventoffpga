@@ -131,6 +131,12 @@ Once the puzzle is solved, the FSM transitions back to `IDLE`, where the output 
 
 ### Adder
 
-The fourth of the design is a single, combinational, 2 input, 24-bit adder that computes the accumulated value. Since only a single sum is computed at a time, only a single adder is needed. This also avoids implementing each `fifo_accum_val[23:0]` as an accumulator register which may synthesize to multiple adders. Then the adder instead has 2 inputs `accum_input0[23:0]` and `accum_input1[23:0]` whose values are multiplexed by the control FSM from input sources. The adder's combinational output `accum_result[23:0]` is also multiplexed by the control FSM to be saved to various registers, primarily to the `fifo_accum_val[23:0]` where the write pointer points to.
+The fourth block is a single cycle, combinational, 2 input, 24-bit adder that computes the accumulated value. Since only a single sum is computed at a time, only a single adder is needed. This also avoids implementing each `fifo_accum_val[23:0]` as an accumulator register which may synthesize to multiple adders. Then the adder instead has 2 inputs `accum_input0[23:0]` and `accum_input1[23:0]` whose values are multiplexed by the control FSM from input sources. The adder's combinational output `accum_result[23:0]` is also multiplexed by the control FSM to be saved to various registers, primarily to the `fifo_accum_val[23:0]` where the write pointer points to.
 
 ### Multiplier
+
+The fifth block is a single cycle, combinational, 2 input 49-bit multiplier that computes the intermediate and final products for part 2. Similar to the adder, only a single product is computed at a time and has its inputs multiplexed and controlled by the FSM. The 2 inputs are:
+1. `mul_input0[48:0]` - this is 49 bits since its largest possible input comes from the 49-bit product register `prod_reg[48:0]`, which stores the intermediate product
+2. `mul_input1[23:0]` - this is only 24 bits since its largest possible input comes from the 24-bit accumulated values
+
+The output `prod_result[48:0]` is always saved to the product register `prod_reg[48:0]`. There is no overflow detection done, since the product bit widths were only computed based on the part 2 answer using my input. Since the product bitwidth is is also parametrized, it can be increased if the expected part 2 answer does not fit.
