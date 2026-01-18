@@ -363,8 +363,11 @@ module digital_top
                 if (fifo_empty) begin
                     next_state = `OUTPUT_RESULT;
 
-                    done = 1'b1;
                     rd_next_node = 1'b0;
+
+                    // Assert done flag only after part 1, or after the last BFS iteration of part 2
+                    done = (part1_selected | part2_iter_end_selected);
+
                 end else begin
                     next_state = `PUSH_NEXT_NODE;
                 end
@@ -418,8 +421,10 @@ module digital_top
                 if (fifo_empty & (node_idx_reg != start_node_idx)) begin
                     next_state = `OUTPUT_RESULT;
 
-                    done = 1'b1;
                     rd_next_node = 1'b0;
+
+                    // Assert done flag only after part 1, or after the last BFS iteration of part 2
+                    done = (part1_selected | part2_iter_end_selected);
 
                 // If on the last next_node_idx, go back to popping the queue,
                 //   otherwise there are more next_node_idx so keep pushing
@@ -435,7 +440,7 @@ module digital_top
             end
             `OUTPUT_RESULT : begin
                 // TODO
-                if (part2_iter_mid1_selected) begin
+                if (part2_iter_mid0_selected) begin
                     // Push mid0 node to the FIFO queue
                     //   as the start node
                     fifo_wr_en = 1'b1;
@@ -450,8 +455,11 @@ module digital_top
                     node_idx = mid0_node_idx;
                     rd_next_node = 1'b1;
 
+                    // Update part 2 iteration
+                    next_part2_iter = `PART2_ITER_MID1;
+
                     next_state = `POP_CURR_NODE;
-                end else if (part2_iter_end_selected) begin
+                end else if (part2_iter_mid1_selected) begin
                     // Push mid1 node to the FIFO queue
                     //   as the start node
                     fifo_wr_en = 1'b1;
@@ -465,6 +473,9 @@ module digital_top
                     //   during POP_CURR_NODE state
                     node_idx = mid1_node_idx;
                     rd_next_node = 1'b1;
+
+                    // Update part 2 iteration
+                    next_part2_iter = `PART2_ITER_END;
 
                     next_state = `POP_CURR_NODE;
 
