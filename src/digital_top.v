@@ -51,6 +51,9 @@
 `define MID1_NODE_MUL_IN1_SEL 2'b01
 `define END_NODE_MUL_IN1_SEL  2'b10
 
+// For padding MSBs of accumulator value to product width
+`define ZERO_PAD_ACCUM {PARAM_PROD_VAL_WIDTH-PARAM_ACCUM_VAL_WIDTH{1'b0}}
+
 module digital_top
 #(
     parameter PARAM_NODE_IDX_WIDTH  = 10,
@@ -73,16 +76,13 @@ module digital_top
     input      [PARAM_NODE_IDX_WIDTH-1:0]  next_node_idx,
     input      [PARAM_COUNTER_WIDTH-1:0]   next_node_counter, // TODO: check max number of edges
 
-    output reg [PARAM_ACCUM_VAL_WIDTH-1:0] part1_ans,
-    output reg [PARAM_PROD_VAL_WIDTH-1:0]  part2_ans,
+    output reg [PARAM_PROD_VAL_WIDTH-1:0]  part_ans,
     output reg                             done_reg
 );
 
     // Part 1: Answer is the end node accumulated value
-    assign part1_ans = end_node_accum;
-
     // Part 2: Answer is the product register value
-    assign part2_ans = prod_reg;
+    assign part_ans = (part_sel) ? prod_reg : {`ZERO_PAD_ACCUM, end_node_accum};
 
     // Registers with specialized functions
     reg [PARAM_NODE_IDX_WIDTH-1:0]  start_node_idx;
@@ -140,7 +140,7 @@ module digital_top
         case (mul_input0_sel)
             `ZERO_MUL_IN0_SEL      : mul_input0 = 'd0;
                                      // Pad MSBs with 0s
-            `MID0_NODE_MUL_IN0_SEL : mul_input0 = {{PARAM_PROD_VAL_WIDTH-PARAM_ACCUM_VAL_WIDTH{1'b0}}, mid0_node_accum};
+            `MID0_NODE_MUL_IN0_SEL : mul_input0 = {`ZERO_PAD_ACCUM, mid0_node_accum};
             `PROD_MUL_IN0_SEL      : mul_input0 = prod_reg;
             default                : mul_input0 = 'd0;
         endcase
